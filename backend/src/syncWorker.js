@@ -5,13 +5,18 @@ import {
   testConnection, 
   getLatestTimestamp, 
   logSync,
+  logScheduledJob,
   setInitialSyncComplete,
   isInitialSyncComplete,
   getInitialSyncStatus,
   getAllEarliestTimestamps,
   updateChunkCompletion,
   getLastCompletedChunk,
-  markInitialSyncComplete
+  markInitialSyncComplete,
+  getCountrySyncStatus,
+  getAllCountrySyncStatus,
+  updateCountrySyncStatus,
+  initializeCountrySyncStatus
 } from './database.js';
 import pool from './database.js';
 
@@ -25,18 +30,29 @@ class SyncWorker {
     this.jobs = new Map();
     this.startTime = moment();
     this.lastHealthCheck = null;
+    this.lastProcessUptime = 0;
     this.healthCheckInterval = null;
     this.nordPoolJobs = {};
     this.weeklySyncJob = null;
     this.nextDaySyncJob = null;
     this.dailySyncJobs = [];
+    this.dailySyncTimeout = null; // Track the current setTimeout for daily sync
+    this.dailySyncNextRun = null; // Track when the next daily sync will run
+    this.dailySyncLastCheck = null; // Track when the last sync check ran
+    this.dailySyncSuppressedDate = null; // Track which date has suppressed daily sync
+    this.dailySyncWatchdogInterval = null; // Watchdog to ensure sync is scheduled
+    this.dailySyncFallbackCron = null; // Fallback cron job as safety net
   }
 
   // Start the worker
   async start() {
-    console.log('Starting Electricity Prices Sync Worker...');
-    console.log('Current timezone:', moment.tz().zoneName());
-    console.log('Current time:', moment().format('YYYY-MM-DD HH:mm:ss'));
+    const wakeUpTime = moment();
+    console.log('='.repeat(80));
+    console.log('[SYNC WORKER WAKE-UP] Starting Electricity Prices Sync Worker...');
+    console.log('[SYNC WORKER WAKE-UP] Wake-up timestamp:', wakeUpTime.toISOString());
+    console.log('[SYNC WORKER WAKE-UP] Current timezone:', moment.tz().zoneName());
+    console.log('[SYNC WORKER WAKE-UP] Current time:', wakeUpTime.format('YYYY-MM-DD HH:mm:ss'));
+    console.log('='.repeat(80));
     
     this.startTime = moment();
 
@@ -49,7 +65,7 @@ class SyncWorker {
     // Schedule weekly full sync (every Sunday at 2 AM)
     this.scheduleWeeklySync('0 2 * * 0', 'Weekly Full Sync');
 
-    // Schedule next day sync (every day at 13:30 CET - after NordPool publishes next day data)
+    // Schedule next day sync (every day at 13:30 UTC - after NordPool publishes next day data)
     this.scheduleNextDaySync('30 13 * * *', 'Next Day Sync');
 
     // Start health monitoring
@@ -81,12 +97,69 @@ class SyncWorker {
   // Perform comprehensive health check
   async performHealthCheck() {
     try {
-      this.lastHealthCheck = moment();
+      const now = moment();
+      const processUptimeSeconds = process.uptime();
+      const realElapsedSeconds = now.diff(this.startTime, 'seconds');
+      const timeDifference = realElapsedSeconds - processUptimeSeconds;
+      
+      // Detect pause/resume using two methods:
+      // 1. Compare consecutive health checks (if lastHealthCheck exists)
+      // 2. Compare process uptime vs real elapsed time (always works)
+      
+      let pauseDetected = false;
+      let pauseDuration = 0;
+      
+      if (this.lastHealthCheck) {
+        const timeSinceLastCheck = now.diff(this.lastHealthCheck, 'seconds');
+        const expectedProcessUptime = processUptimeSeconds - (this.lastProcessUptime || 0);
+        
+        // Method 1: If more than 5 minutes of real time passed but process only advanced a few seconds, we were paused
+        if (timeSinceLastCheck > 300 && expectedProcessUptime < 60) {
+          pauseDetected = true;
+          pauseDuration = timeSinceLastCheck - expectedProcessUptime;
+        }
+      }
+      
+      // Method 2: If process uptime is significantly less than real elapsed time, we were paused at some point
+      // This catches pauses even if lastHealthCheck wasn't set (e.g., first check after long pause)
+      if (timeDifference > 300 && !pauseDetected) {
+        pauseDetected = true;
+        pauseDuration = timeDifference;
+      }
+      
+      if (pauseDetected) {
+        console.log('='.repeat(80));
+        console.log(`[PAUSE/RESUME DETECTED] Container was paused and resumed!`);
+        if (this.lastHealthCheck) {
+          const timeSinceLastCheck = now.diff(this.lastHealthCheck, 'seconds');
+          console.log(`[PAUSE/RESUME] Time since last health check: ${Math.floor(timeSinceLastCheck / 60)} minutes`);
+        }
+        console.log(`[PAUSE/RESUME] Process uptime: ${Math.floor(processUptimeSeconds / 60)} minutes`);
+        console.log(`[PAUSE/RESUME] Real elapsed time: ${Math.floor(realElapsedSeconds / 60)} minutes`);
+        console.log(`[PAUSE/RESUME] Estimated pause duration: ${Math.floor(pauseDuration / 60)} minutes`);
+        console.log(`[PAUSE/RESUME] Triggering wake-up recovery sync...`);
+        console.log('='.repeat(80));
+        
+        // Trigger wake-up recovery
+        await this.checkAndSyncFromLastSyncOk();
+      }
+      
+      this.lastHealthCheck = now;
+      this.lastProcessUptime = processUptimeSeconds;
+      
       console.log(`[Health Check] ${this.lastHealthCheck.format('YYYY-MM-DD HH:mm:ss')}`);
+      console.log(`[Health Check] Process uptime: ${Math.floor(processUptimeSeconds / 3600)}h ${Math.floor((processUptimeSeconds % 3600) / 60)}m`);
+      console.log(`[Health Check] Real elapsed time: ${Math.floor(realElapsedSeconds / 3600)}h ${Math.floor((realElapsedSeconds % 3600) / 60)}m`);
+      if (timeDifference > 60) {
+        console.log(`[Health Check] Time difference (pause/resume indicator): ${Math.floor(timeDifference / 60)} minutes`);
+      }
       
       const health = {
         timestamp: this.lastHealthCheck.toISOString(),
         uptime: moment.duration(moment().diff(this.startTime)).asHours(),
+        processUptime: processUptimeSeconds,
+        realElapsedTime: realElapsedSeconds,
+        timeDifference: timeDifference,
         database: await this.checkDatabaseHealth(),
         cronJobs: this.checkCronJobsHealth(),
         dataCompleteness: await this.checkDataCompleteness(),
@@ -299,10 +372,11 @@ class SyncWorker {
     const initialSyncStatus = await getInitialSyncStatus();
     if (initialSyncStatus.isComplete) {
       console.log(`[Startup Sync] Initial sync already completed to ${initialSyncStatus.completedDate} (${initialSyncStatus.recordsCount} records)`);
-      console.log('[Startup Sync] Skipping further initial sync checks, proceeding with other tasks...');
       
-      // Skip further initial sync checks, proceed with other tasks
-      // Note: Recent data sync is now handled by daily sync logic
+      // Check country sync status and sync from last_sync_ok_date
+      console.log('[Startup Sync] Checking country sync status for wake-up recovery...');
+      await this.checkAndSyncFromLastSyncOk();
+      
       return;
     }
     
@@ -312,8 +386,373 @@ class SyncWorker {
     try {
       const totalRecords = await this.runInitialSyncWithChunks();
       console.log(`[Startup Sync] Initial sync completed successfully: ${totalRecords} records`);
+      
+      // After initial sync, initialize country sync status
+      await this.initializeCountrySyncStatuses();
     } catch (error) {
       console.error('[Startup Sync] Error during initial sync:', error.message);
+    }
+  }
+
+  // Update sync status for all countries based on latest complete date
+  async updateAllCountriesSyncStatus(targetDate) {
+    const countries = ['lt', 'ee', 'lv', 'fi'];
+    
+    // Find the latest timestamp across all countries
+    let globalMaxTimestamp = null;
+    for (const country of countries) {
+      const latestTimestamp = await this.getLatestPriceTimestamp(country);
+      if (latestTimestamp && (!globalMaxTimestamp || latestTimestamp > globalMaxTimestamp)) {
+        globalMaxTimestamp = latestTimestamp;
+      }
+    }
+    
+    if (!globalMaxTimestamp) {
+      console.log('[Sync Status] No data found for any country, cannot update sync status');
+      return;
+    }
+    
+    const maxDate = moment.unix(globalMaxTimestamp).tz('Europe/Vilnius');
+    const now = moment().tz('Europe/Vilnius');
+    const targetMoment = targetDate || now.clone().add(2, 'days');
+    
+    // Find the last fully complete date (check backwards from maxDate)
+    let lastCompleteDate = null;
+    let lastCompleteTimestamp = null;
+    let checkDate = maxDate.clone().startOf('day');
+    const minCheckDate = moment('2012-07-01').tz('Europe/Vilnius');
+    
+    // Check up to 7 days back to find the last complete date
+    for (let i = 0; i < 7 && checkDate.isSameOrAfter(minCheckDate, 'day'); i++) {
+      const dateStr = checkDate.format('YYYY-MM-DD');
+      const dateStatus = await this.isDateComplete(dateStr);
+      
+      if (dateStatus.isComplete) {
+        lastCompleteDate = checkDate.clone();
+        lastCompleteTimestamp = checkDate.clone().startOf('day').unix();
+        console.log(`[Sync Status] Found last complete date: ${dateStr} (maxTimestamp was ${maxDate.format('YYYY-MM-DD HH:mm:ss')})`);
+        break;
+      }
+      
+      checkDate.subtract(1, 'day');
+    }
+    
+    // Update all countries with the same last complete date
+    if (lastCompleteDate) {
+      const cappedDate = lastCompleteDate.isAfter(targetMoment) ? targetMoment : lastCompleteDate;
+      const cappedTimestamp = lastCompleteDate.isAfter(targetMoment) 
+        ? targetMoment.clone().startOf('day').unix() 
+        : lastCompleteDate.clone().startOf('day').unix();
+      
+      for (const country of countries) {
+        await updateCountrySyncStatus(country, cappedDate.format('YYYY-MM-DD'), cappedTimestamp, true);
+      }
+      console.log(`[Sync Status] Updated all countries: sync_ok=true, last_sync_ok_date=${cappedDate.format('YYYY-MM-DD')} (fully complete)`);
+    } else {
+      // No complete dates found - update each country with its current status but mark sync_ok=false
+      for (const country of countries) {
+        const currentStatus = await getCountrySyncStatus(country);
+        if (currentStatus) {
+          await updateCountrySyncStatus(country, currentStatus.last_sync_ok_date, currentStatus.last_sync_ok_timestamp, false);
+        }
+      }
+      console.log(`[Sync Status] No complete dates found, all countries marked sync_ok=false`);
+    }
+  }
+
+  // Check country sync status and sync from last_sync_ok_date (wake-up recovery)
+  async checkAndSyncFromLastSyncOk() {
+    const countries = ['lt', 'ee', 'lv', 'fi'];
+    const now = moment().tz('Europe/Vilnius');
+    
+    console.log('[Wake-up Recovery] Checking country sync status from DB...');
+    
+    // First, initialize any missing sync statuses
+    for (const country of countries) {
+      try {
+        const syncStatus = await getCountrySyncStatus(country);
+        
+        if (!syncStatus) {
+          // No sync status exists - initialize from latest data in DB
+          console.log(`[Wake-up Recovery] ${country.toUpperCase()}: No sync status found, initializing from database...`);
+          const latestTimestamp = await this.getLatestPriceTimestamp(country);
+          
+          if (latestTimestamp) {
+            const latestDate = moment.unix(latestTimestamp).tz('Europe/Vilnius');
+            const targetDate = now.clone().add(2, 'days');
+            const cappedDate = latestDate.isAfter(targetDate) ? targetDate : latestDate;
+            const cappedTimestamp = latestDate.isAfter(targetDate) ? targetDate.unix() : latestTimestamp;
+            
+            await initializeCountrySyncStatus(country, cappedDate.format('YYYY-MM-DD'), cappedTimestamp, false);
+            console.log(`[Wake-up Recovery] ${country.toUpperCase()}: Initialized from DB - last_sync_ok_date=${cappedDate.format('YYYY-MM-DD')} (sync_ok=false)`);
+          } else {
+            // No data at all - start from beginning
+            console.log(`[Wake-up Recovery] ${country.toUpperCase()}: No data found, will sync from beginning`);
+            await initializeCountrySyncStatus(country, '2012-07-01', null, false);
+          }
+        }
+      } catch (error) {
+        console.error(`[Wake-up Recovery] ${country.toUpperCase()}: Error initializing sync status:`, error.message);
+      }
+    }
+    
+    // Get the latest available date from Elering API (only if we need to sync)
+    // First check if any country needs syncing based on DB flags
+    let needsAnySync = false;
+    const countriesToSync = [];
+    
+    for (const country of countries) {
+      try {
+        const currentStatus = await getCountrySyncStatus(country);
+        if (!currentStatus) {
+          console.warn(`[Wake-up Recovery] ${country.toUpperCase()}: Failed to get sync status, will sync`);
+          needsAnySync = true;
+          // We'll determine the date range after getting API latest date
+          continue;
+        }
+        
+        // Use the DB flag: if sync_ok=true, last_sync_ok_date is the last fully complete date
+        // We need to sync from last_sync_ok_date + 1 day forward
+        const lastSyncOkDate = moment(currentStatus.last_sync_ok_date);
+        const targetDate = now.clone().add(2, 'days');
+        
+        // Sync if:
+        // 1. sync_ok is false (incomplete data), OR
+        // 2. last_sync_ok_date is before target date (need to catch up)
+        const needsSync = !currentStatus.sync_ok || lastSyncOkDate.isBefore(targetDate, 'day');
+        
+        if (needsSync) {
+          needsAnySync = true;
+          // Determine sync start date:
+          // - If sync_ok=true: start from last_sync_ok_date + 1 day (next day after complete date)
+          // - If sync_ok=false: start from last_sync_ok_date - 1 day (to catch up on incomplete data)
+          let syncStartDate;
+          if (currentStatus.sync_ok) {
+            // Last complete date is known, start from the next day
+            syncStartDate = lastSyncOkDate.clone().add(1, 'day').startOf('day');
+          } else {
+            // Data is incomplete, start from 1 day before to ensure we don't miss anything
+            syncStartDate = lastSyncOkDate.clone().subtract(1, 'day').startOf('day');
+          }
+          
+          countriesToSync.push({ 
+            country, 
+            syncStartDate: syncStartDate.format('YYYY-MM-DD'),
+            lastSyncOkDate: currentStatus.last_sync_ok_date,
+            syncOk: currentStatus.sync_ok
+          });
+          console.log(`[Wake-up Recovery] ${country.toUpperCase()}: Needs sync from ${syncStartDate.format('YYYY-MM-DD')} (last_sync_ok_date=${currentStatus.last_sync_ok_date}, sync_ok=${currentStatus.sync_ok})`);
+        } else {
+          console.log(`[Wake-up Recovery] ${country.toUpperCase()}: Sync status is OK, data is up to date (last_sync_ok_date=${currentStatus.last_sync_ok_date}, sync_ok=${currentStatus.sync_ok})`);
+        }
+      } catch (error) {
+        console.error(`[Wake-up Recovery] ${country.toUpperCase()}: Error checking sync status:`, error.message);
+      }
+    }
+    
+    // Only get latest available date from API if we need to sync
+    // Determine the start date (day after the latest successful sync across all countries)
+    let startDateForCheck = null;
+    for (const country of countries) {
+      const currentStatus = await getCountrySyncStatus(country);
+      if (currentStatus && currentStatus.sync_ok && currentStatus.last_sync_ok_date) {
+        const lastSyncOkDate = moment(currentStatus.last_sync_ok_date);
+        const nextDay = lastSyncOkDate.clone().add(1, 'day');
+        if (!startDateForCheck || nextDay.isAfter(startDateForCheck)) {
+          startDateForCheck = nextDay;
+        }
+      }
+    }
+    
+    // If no successful sync found, default to now + 2 days
+    if (!startDateForCheck) {
+      startDateForCheck = now.clone().add(2, 'days');
+    }
+    
+    // Get our latest timestamps from database for comparison
+    const ourLatestTimestamps = {};
+    for (const country of countries) {
+      const latestTimestamp = await this.getLatestPriceTimestamp(country);
+      if (latestTimestamp) {
+        ourLatestTimestamps[country] = latestTimestamp;
+      }
+    }
+    
+    let targetEndDate = now.clone().add(2, 'days'); // Default fallback
+    if (needsAnySync) {
+      console.log(`[Wake-up Recovery] Determining latest available date from Elering API (checking from ${startDateForCheck.format('YYYY-MM-DD')})...`);
+      try {
+        const apiLatestDate = await this.api.getLatestAvailableDateAll(startDateForCheck.format('YYYY-MM-DD'), 7, ourLatestTimestamps);
+        if (apiLatestDate) {
+          targetEndDate = apiLatestDate;
+          console.log(`[Wake-up Recovery] Latest available date from API: ${targetEndDate.format('YYYY-MM-DD')}`);
+        } else {
+          // No data available from API or we're already up to date
+          console.log(`[Wake-up Recovery] No new data available from API (we're up to date or no data found), using default (now + 2 days): ${targetEndDate.format('YYYY-MM-DD')}`);
+        }
+      } catch (error) {
+        console.warn(`[Wake-up Recovery] Could not determine latest available date, using default (now + 2 days):`, error.message);
+      }
+      
+      // Update sync end dates for countries that need syncing
+      for (const syncInfo of countriesToSync) {
+        syncInfo.syncEndDate = targetEndDate.format('YYYY-MM-DD');
+      }
+      
+      // Also handle countries without sync status
+      for (const country of countries) {
+        const currentStatus = await getCountrySyncStatus(country);
+        if (!currentStatus) {
+          countriesToSync.push({ country, syncStartDate: '2012-07-01', syncEndDate: targetEndDate.format('YYYY-MM-DD') });
+        }
+      }
+    }
+    
+    // Sync all countries that need it
+    if (countriesToSync.length > 0) {
+      console.log(`[Wake-up Recovery] Syncing ${countriesToSync.length} countries...`);
+      
+      // Find the union of all date ranges (earliest start, latest end)
+      const startDates = countriesToSync.map(c => moment(c.syncStartDate));
+      const endDates = countriesToSync.map(c => moment(c.syncEndDate));
+      const globalStartDate = moment.min(startDates);
+      const globalEndDate = moment.max(endDates);
+      
+      // Before fetching, check if we have incomplete days and if more data is available
+      // If today is complete and we only have partial data for tomorrow, check if more is available
+      const today = now.format('YYYY-MM-DD');
+      const todayStatus = await this.isDateComplete(today);
+      const tomorrow = now.clone().add(1, 'day').format('YYYY-MM-DD');
+      const tomorrowStatus = await this.isDateComplete(tomorrow);
+      
+      // If today is complete and tomorrow is incomplete, check if more data is available
+      let shouldFetch = true;
+      if (todayStatus.isComplete && !tomorrowStatus.isComplete) {
+        console.log(`[Wake-up Recovery] Today (${today}) is complete, tomorrow (${tomorrow}) is incomplete. Checking if more data is available...`);
+        try {
+          // Check from tomorrow (the day after today, which is complete)
+          const tomorrowMoment = moment(tomorrow);
+          const apiLatestDate = await this.api.getLatestAvailableDateAll(tomorrow, 7);
+          if (apiLatestDate) {
+            const apiLatestMoment = moment(apiLatestDate);
+            
+            // If API latest date is not after tomorrow, no more data is available
+            if (!apiLatestMoment.isAfter(tomorrowMoment, 'day')) {
+              console.log(`[Wake-up Recovery] No more data available for ${tomorrow} (API latest: ${apiLatestDate.format('YYYY-MM-DD')}). Skipping ingestion.`);
+              shouldFetch = false;
+            } else {
+              console.log(`[Wake-up Recovery] More data available (API latest: ${apiLatestDate.format('YYYY-MM-DD')}). Proceeding with fetch.`);
+            }
+          } else {
+            console.log(`[Wake-up Recovery] Could not determine API latest date, proceeding with fetch.`);
+          }
+        } catch (error) {
+          console.warn(`[Wake-up Recovery] Error checking API latest date: ${error.message}. Proceeding with fetch.`);
+        }
+      }
+      
+      if (shouldFetch) {
+        console.log(`[Wake-up Recovery] Fetching data for all countries from ${globalStartDate.format('YYYY-MM-DD')} to ${globalEndDate.format('YYYY-MM-DD')}`);
+        
+        // Fetch data once for all countries
+        try {
+          const allCountriesData = await this.api.fetchAllCountriesData(
+            globalStartDate.toDate(), 
+            globalEndDate.toDate()
+          );
+          
+          if (!allCountriesData || Object.keys(allCountriesData).length === 0) {
+            console.log('[Wake-up Recovery] No data received from API');
+          } else {
+            // Ingest data for all countries that need syncing
+            const countriesToIngest = new Set(countriesToSync.map(c => c.country));
+            let totalRecords = 0;
+            
+            for (const country of Object.keys(allCountriesData)) {
+              if (countriesToIngest.has(country)) {
+                const countryData = allCountriesData[country];
+                if (countryData && countryData.length > 0) {
+                  console.log(`[Wake-up Recovery] Ingesting ${country.toUpperCase()}: ${countryData.length} records`);
+                  const result = await this.insertPriceData(countryData, country);
+                  totalRecords += result.insertedCount;
+                  console.log(`[Wake-up Recovery] Ingested ${result.insertedCount} records for ${country.toUpperCase()}`);
+                }
+              }
+            }
+            
+            console.log(`[Wake-up Recovery] Total records ingested: ${totalRecords}`);
+          }
+        } catch (error) {
+          console.error(`[Wake-up Recovery] Error fetching/ingesting data:`, error.message);
+        }
+      }
+      
+      // After all countries are synced, check completeness once and update all countries
+      console.log('[Wake-up Recovery] All countries synced, checking completeness...');
+      await this.updateAllCountriesSyncStatus(targetEndDate);
+    } else {
+      // No sync needed, but still check completeness in case status is stale
+      console.log('[Wake-up Recovery] No countries need syncing, checking completeness...');
+      await this.updateAllCountriesSyncStatus(targetEndDate);
+    }
+  }
+
+  // Initialize country sync statuses from database after initial sync
+  async initializeCountrySyncStatuses() {
+    const countries = ['lt', 'ee', 'lv', 'fi'];
+    
+    console.log('[Country Sync Status] Initializing country sync statuses from database...');
+    
+    for (const country of countries) {
+      try {
+        const latestTimestamp = await this.getLatestPriceTimestamp(country);
+        if (latestTimestamp) {
+          const latestDate = moment.unix(latestTimestamp).tz('Europe/Vilnius');
+          const now = moment().tz('Europe/Vilnius');
+          const targetDate = now.clone().add(2, 'days');
+          
+          // Find the last fully complete date (not just latest date with data)
+          let lastCompleteDate = null;
+          let lastCompleteTimestamp = null;
+          let checkDate = latestDate.clone().startOf('day');
+          const minCheckDate = moment('2012-07-01');
+          
+          // Check up to 7 days back to find the last complete date
+          for (let i = 0; i < 7 && checkDate.isSameOrAfter(minCheckDate, 'day'); i++) {
+            const dateStr = checkDate.format('YYYY-MM-DD');
+            const dateStatus = await this.isDateComplete(dateStr);
+            
+            if (dateStatus.isComplete) {
+              lastCompleteDate = checkDate.clone();
+              lastCompleteTimestamp = checkDate.clone().endOf('day').unix();
+              console.log(`[Country Sync Status] ${country.toUpperCase()}: Found last complete date: ${dateStr}`);
+              break;
+            }
+            
+            checkDate.subtract(1, 'day');
+          }
+          
+          if (lastCompleteDate) {
+            // Cap at target date
+            const cappedDate = lastCompleteDate.isAfter(targetDate) ? targetDate : lastCompleteDate;
+            const cappedTimestamp = lastCompleteDate.isAfter(targetDate) ? targetDate.unix() : lastCompleteTimestamp;
+            
+            await initializeCountrySyncStatus(country, cappedDate.format('YYYY-MM-DD'), cappedTimestamp);
+            console.log(`[Country Sync Status] ${country.toUpperCase()}: Initialized - last_sync_ok_date=${cappedDate.format('YYYY-MM-DD')} (fully complete)`);
+          } else {
+            // No complete dates found - initialize with latest date but sync_ok=false
+            const cappedDate = latestDate.isAfter(targetDate) ? targetDate : latestDate;
+            const cappedTimestamp = latestDate.isAfter(targetDate) ? targetDate.unix() : latestTimestamp;
+            
+            await initializeCountrySyncStatus(country, cappedDate.format('YYYY-MM-DD'), cappedTimestamp);
+            console.log(`[Country Sync Status] ${country.toUpperCase()}: Initialized - last_sync_ok_date=${cappedDate.format('YYYY-MM-DD')} (incomplete, sync_ok=false)`);
+          }
+        } else {
+          console.warn(`[Country Sync Status] ${country.toUpperCase()}: No data found, cannot initialize`);
+        }
+      } catch (error) {
+        console.error(`[Country Sync Status] ${country.toUpperCase()}: Error initializing:`, error.message);
+      }
     }
   }
 
@@ -405,8 +844,67 @@ class SyncWorker {
   // Check if a specific date is complete (has at least 22 records for all countries)
   async isDateComplete(date) {
     try {
-      const startOfDay = moment(date).startOf('day').unix();
-      const endOfDay = moment(date).endOf('day').unix();
+      const startOfDay = moment(date).tz('Europe/Vilnius').startOf('day').unix();
+      const endOfDay = moment(date).tz('Europe/Vilnius').endOf('day').unix();
+      
+      // First, get record count to help determine interval
+      const countResult = await pool.query(`
+        SELECT COUNT(*) as total_count
+        FROM price_data 
+        WHERE timestamp BETWEEN $1 AND $2
+        LIMIT 1
+      `, [startOfDay, endOfDay]);
+      
+      const totalCount = countResult.rows[0] ? parseInt(countResult.rows[0].total_count, 10) : 0;
+      
+      // Determine the interval (MTU) for this date
+      // Use record count as primary indicator: 90+ records = 15-min MTU, <30 = 60-min MTU
+      let expectedRecordsMin = 24; // Default to 60-minute MTU (24 hours)
+      let expectedRecordsMax = 24;
+      
+      // If we have a high record count (>= 90), it's definitely 15-minute MTU
+      if (totalCount >= 90) {
+        // 15-minute MTU
+        // Standard day: 96 records (24 hours * 4)
+        // DST spring forward (lose 1 hour): 92 records (23 hours * 4)
+        // DST fall back (gain 1 hour): 100 records (25 hours * 4)
+        expectedRecordsMin = 92; // Minimum for DST spring forward
+        expectedRecordsMax = 100; // Maximum for DST fall back
+      } else if (totalCount > 0) {
+        // For lower counts, check the actual interval between timestamps
+        const intervalResult = await pool.query(`
+          SELECT timestamp
+          FROM price_data 
+          WHERE timestamp BETWEEN $1 AND $2
+          ORDER BY timestamp
+          LIMIT 10
+        `, [startOfDay, endOfDay]);
+        
+        if (intervalResult.rows.length >= 2) {
+          // Check multiple intervals to find the most common one
+          const intervals = [];
+          for (let i = 1; i < intervalResult.rows.length; i++) {
+            const diff = intervalResult.rows[i].timestamp - intervalResult.rows[i-1].timestamp;
+            if (diff > 0) {
+              intervals.push(diff);
+            }
+          }
+          
+          // Find the most common interval
+          const mostCommonInterval = intervals.length > 0 ? intervals[0] : null;
+          
+          if (mostCommonInterval === 900) {
+            // 15-minute MTU
+            expectedRecordsMin = 92;
+            expectedRecordsMax = 100;
+          } else if (mostCommonInterval === 3600) {
+            // 60-minute MTU
+            expectedRecordsMin = 23;
+            expectedRecordsMax = 25;
+          }
+          // If interval is neither 900 nor 3600, keep default (24-24 for 60-min)
+        }
+      }
       
       const result = await pool.query(`
         SELECT country, COUNT(*) as record_count
@@ -429,15 +927,22 @@ class SyncWorker {
         countryCounts[row.country] = parseInt(row.record_count, 10);
       });
       
-      // Check if all countries have at least 22 records
-      const isComplete = countries.every(country => countryCounts[country] >= 22);
+      // Check if all countries have records within the expected range (accounting for DST)
+      // A day is complete if all countries have at least the minimum expected records
+      // and no country has significantly more than the maximum (indicating data from next day)
+      const isComplete = countries.every(country => {
+        const count = countryCounts[country];
+        return count >= expectedRecordsMin && count <= expectedRecordsMax;
+      });
       
-      console.log(`[Date Complete Check] ${date}: ${JSON.stringify(countryCounts)} - Complete: ${isComplete}`);
+      console.log(`[Date Complete Check] ${date}: ${JSON.stringify(countryCounts)} (expected: ${expectedRecordsMin}-${expectedRecordsMax}) - Complete: ${isComplete}`);
       
       return {
         isComplete,
         countryCounts,
-        date
+        date,
+        expectedRecordsMin,
+        expectedRecordsMax
       };
     } catch (error) {
       console.error(`[Date Complete Check] Error checking completeness for ${date}:`, error.message);
@@ -450,31 +955,195 @@ class SyncWorker {
     }
   }
 
-  // Check if recent data needs syncing based on date completeness
-  async checkRecentDataSyncByCompleteness() {
-    console.log('[Recent Data Sync] Checking data completeness for recent dates...');
+  // Check if we should suppress daily sync for today
+  async shouldSuppressDailySyncForToday() {
+    const now = moment().tz('Europe/Vilnius');
+    const today = now.format('YYYY-MM-DD');
     
-    const today = moment().format('YYYY-MM-DD');
-    const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
-    
-    // Check if yesterday is complete
-    const yesterdayStatus = await this.isDateComplete(yesterday);
-    
-    if (!yesterdayStatus.isComplete) {
-      console.log(`[Recent Data Sync] Yesterday (${yesterday}) is not complete. Running sync...`);
-      try {
-        await this.syncFromLastAvailable();
-        console.log('[Recent Data Sync] Sync completed');
-      } catch (error) {
-        console.error('[Recent Data Sync] Error during sync:', error.message);
+    // If we already suppressed for today, check if it's still valid
+    if (this.dailySyncSuppressedDate === today) {
+      // Verify today is still complete
+      const todayStatus = await this.isDateComplete(today);
+      if (todayStatus.isComplete) {
+        return true; // Still complete, keep suppressed
+      } else {
+        // No longer complete, clear suppression
+        console.log(`[Daily Sync] Date ${today} is no longer complete, clearing suppression`);
+        this.dailySyncSuppressedDate = null;
+        return false;
       }
-    } else {
-      console.log(`[Recent Data Sync] Yesterday (${yesterday}) is complete. No sync needed.`);
     }
     
-    // Also check today's progress (for monitoring)
+    // Check if today is complete
     const todayStatus = await this.isDateComplete(today);
-    console.log(`[Recent Data Sync] Today (${today}) progress: ${JSON.stringify(todayStatus.countryCounts)}`);
+    if (todayStatus.isComplete) {
+      console.log(`[Daily Sync] Today (${today}) is complete, stopping dynamic sync checks`);
+      this.dailySyncSuppressedDate = today;
+      // Stop scheduling if sync is complete
+      if (this.dailySyncTimeout) {
+        clearTimeout(this.dailySyncTimeout);
+        this.dailySyncTimeout = null;
+        this.dailySyncNextRun = null;
+      }
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Check if recent data needs syncing based on per-day completion (daily sync logic)
+  async checkRecentDataSyncByCompleteness() {
+    console.log('[Daily Sync] Checking per-day completion for recent dates...');
+    
+    const now = moment().tz('Europe/Vilnius');
+    const today = now.format('YYYY-MM-DD');
+    
+    // Check if we should suppress daily sync for today
+    if (await this.shouldSuppressDailySyncForToday()) {
+      console.log(`[Daily Sync] Today (${today}) is complete, sync checks stopped`);
+      return; // Exit early, no sync needed
+    }
+    
+    // If suppressed date is from a previous day, clear it and resume scheduling
+    if (this.dailySyncSuppressedDate && this.dailySyncSuppressedDate !== today) {
+      console.log(`[Daily Sync] Clearing suppression for previous day: ${this.dailySyncSuppressedDate}`);
+      this.dailySyncSuppressedDate = null;
+      // Resume scheduling if we're in active period
+      const nowUTC = moment().tz('UTC');
+      const activeStart = nowUTC.clone().hour(12).minute(45).second(0).millisecond(0);
+      const activeEnd = nowUTC.clone().hour(15).minute(55).second(0).millisecond(0);
+      if (nowUTC.isBetween(activeStart, activeEnd, null, '[]')) {
+        this.scheduleNextCheckIn5Minutes();
+      }
+    }
+    
+    const tomorrow = now.clone().add(1, 'day').format('YYYY-MM-DD');
+    
+    // Get the latest available date from Elering API
+    // Determine the start date (day after the latest successful sync across all countries)
+    let startDateForCheck = null;
+    const countries = ['lt', 'ee', 'lv', 'fi'];
+    for (const country of countries) {
+      const currentStatus = await getCountrySyncStatus(country);
+      if (currentStatus && currentStatus.sync_ok && currentStatus.last_sync_ok_date) {
+        const lastSyncOkDate = moment(currentStatus.last_sync_ok_date);
+        const nextDay = lastSyncOkDate.clone().add(1, 'day');
+        if (!startDateForCheck || nextDay.isAfter(startDateForCheck)) {
+          startDateForCheck = nextDay;
+        }
+      }
+    }
+    
+    // If no successful sync found, default to today
+    if (!startDateForCheck) {
+      startDateForCheck = now.clone();
+    }
+    
+    // Get our latest timestamps from database for comparison
+    const ourLatestTimestamps = {};
+    for (const country of countries) {
+      const latestTimestamp = await this.getLatestPriceTimestamp(country);
+      if (latestTimestamp) {
+        ourLatestTimestamps[country] = latestTimestamp;
+      }
+    }
+    
+    let targetDate;
+    try {
+      targetDate = await this.api.getLatestAvailableDateAll(startDateForCheck.format('YYYY-MM-DD'), 7, ourLatestTimestamps);
+      if (targetDate) {
+        console.log(`[Daily Sync] Latest available date from API: ${targetDate.format('YYYY-MM-DD')} (checked from ${startDateForCheck.format('YYYY-MM-DD')})`);
+      } else {
+        console.log(`[Daily Sync] No new data available from API (we're up to date or no data found), using default (now + 2 days)`);
+        targetDate = now.clone().add(2, 'days');
+      }
+    } catch (error) {
+      console.warn(`[Daily Sync] Could not determine latest available date, using default (now + 2 days):`, error.message);
+      targetDate = now.clone().add(2, 'days');
+    }
+    
+    // Check dates from today to target date
+    const datesToCheck = [];
+    let currentDate = moment(today);
+    const targetMoment = moment(targetDate);
+    
+    while (currentDate.isSameOrBefore(targetMoment, 'day')) {
+      datesToCheck.push(currentDate.format('YYYY-MM-DD'));
+      currentDate.add(1, 'day');
+    }
+    
+    let needsSync = false;
+    const datesToSync = [];
+    
+    // Check each date for completeness
+    for (const dateStr of datesToCheck) {
+      const dateStatus = await this.isDateComplete(dateStr);
+      
+      if (!dateStatus.isComplete) {
+        console.log(`[Daily Sync] Date ${dateStr} is not complete: ${JSON.stringify(dateStatus.countryCounts)}`);
+        datesToSync.push(dateStr);
+        needsSync = true;
+      } else {
+        console.log(`[Daily Sync] Date ${dateStr} is complete, skipping`);
+      }
+    }
+    
+    if (needsSync && datesToSync.length > 0) {
+      console.log(`[Daily Sync] Need to sync dates: ${datesToSync.join(', ')}`);
+      try {
+        // Sync from first missing date - 1 day to target date
+        const syncStartDate = moment(datesToSync[0]).subtract(1, 'day').format('YYYY-MM-DD');
+        const syncEndDate = targetDate.format('YYYY-MM-DD');
+        
+        console.log(`[Daily Sync] Syncing from ${syncStartDate} to ${syncEndDate}...`);
+        await this.checkAndSyncFromLastSyncOk();
+        console.log('[Daily Sync] Sync completed');
+        
+        // After successful sync, check if today is now complete and suppress if so
+        const todayStatusAfterSync = await this.isDateComplete(today);
+        if (todayStatusAfterSync.isComplete) {
+          console.log(`[Daily Sync] Today (${today}) is now complete after sync, suppressing remaining cron jobs for today`);
+          this.dailySyncSuppressedDate = today;
+          this.suppressDailySyncJobs();
+        }
+      } catch (error) {
+        console.error('[Daily Sync] Error during sync:', error.message);
+      }
+    } else {
+      console.log(`[Daily Sync] All dates are complete, no sync needed.`);
+      
+      // If today is complete, suppress remaining cron jobs
+      const todayStatus = await this.isDateComplete(today);
+      if (todayStatus.isComplete) {
+        console.log(`[Daily Sync] Today (${today}) is complete, suppressing remaining cron jobs for today`);
+        this.dailySyncSuppressedDate = today;
+        this.suppressDailySyncJobs();
+      }
+    }
+  }
+  
+  // Suppress daily sync jobs for the current day
+  suppressDailySyncJobs() {
+    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
+      this.dailySyncJobs.forEach(job => {
+        if (job && job.stop) {
+          job.stop();
+        }
+      });
+      console.log(`[Daily Sync] Suppressed ${this.dailySyncJobs.length} daily sync cron jobs`);
+    }
+  }
+  
+  // Resume daily sync jobs (for next day)
+  resumeDailySyncJobs() {
+    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
+      this.dailySyncJobs.forEach(job => {
+        if (job && job.start) {
+          job.start();
+        }
+      });
+      console.log(`[Daily Sync] Resumed ${this.dailySyncJobs.length} daily sync cron jobs`);
+    }
   }
 
   // Simple sync from last available -1 day to today +2 days
@@ -542,10 +1211,10 @@ class SyncWorker {
         return 0;
       }
       
-      const records = await this.insertPriceData(countryData, country);
-      console.log(`Synced ${records} records for ${country.toUpperCase()}`);
+      const result = await this.insertPriceData(countryData, country);
+      console.log(`Synced ${result.insertedCount} records for ${country.toUpperCase()}`);
       
-      return records;
+      return result.insertedCount;
     } catch (error) {
       console.error(`Error syncing chunk for ${country.toUpperCase()}:`, error.message);
       throw error;
@@ -612,72 +1281,317 @@ class SyncWorker {
     }
   }
 
-  // Schedule daily sync that runs every 5 minutes from 12:45 to 15:55 UTC
+  // Schedule daily sync using dynamic setTimeout (every 5 minutes from 12:45 to 15:55 CET)
+  // Nord Pool publishes prices at 12:45 CET
   scheduleDailySync() {
-    // 12:45, 12:50, 12:55
-    const cron1 = '45,50,55 12 * * *';
-    // Every 5 minutes from 13:00 to 15:55
-    const cron2 = '*/5 13-15 * * *';
+    // Clear any existing timeout
+    if (this.dailySyncTimeout) {
+      clearTimeout(this.dailySyncTimeout);
+      this.dailySyncTimeout = null;
+    }
 
-    this.dailySyncJobs = [];
-
-    // First job: 12:45, 12:50, 12:55
-    this.dailySyncJobs.push(cron.schedule(cron1, async () => {
-      console.log('[Daily Sync] (12:45-12:55) Running daily sync check...');
-      try {
-        await this.checkRecentDataSyncByCompleteness();
-      } catch (error) {
-        console.error('[Daily Sync] Error during daily sync:', error.message);
-      }
-    }, {
-      scheduled: false,
-      timezone: 'UTC'
-    }));
-
-    // Second job: every 5 minutes from 13:00 to 15:55
-    this.dailySyncJobs.push(cron.schedule(cron2, async () => {
-      console.log('[Daily Sync] (13:00-15:55) Running daily sync check...');
-      try {
-        await this.checkRecentDataSyncByCompleteness();
-      } catch (error) {
-        console.error('[Daily Sync] Error during daily sync:', error.message);
-      }
-    }, {
-      scheduled: false,
-      timezone: 'UTC'
-    }));
-
-    // Start both jobs
-    this.dailySyncJobs.forEach(job => job.start());
-    console.log(`[Daily Sync] Scheduled daily sync: 12:45,12:50,12:55 and every 5 min 13:00-15:55 UTC`);
-
+    // Start the recursive scheduling
+    this.scheduleNextDailySyncCheck();
+    
+    // Start watchdog to ensure sync is scheduled
+    this.startDailySyncWatchdog();
+    
+    // Start fallback cron job as safety net (runs every 15 minutes during active period)
+    this.startDailySyncFallback();
+    
     // Check for missed jobs on startup and run if needed
     this.checkForMissedDailySync();
+  }
+
+  // Watchdog: Check every 10 minutes if daily sync should be running but isn't scheduled
+  startDailySyncWatchdog() {
+    if (this.dailySyncWatchdogInterval) {
+      clearInterval(this.dailySyncWatchdogInterval);
+    }
+
+    this.dailySyncWatchdogInterval = setInterval(() => {
+      this.checkDailySyncWatchdog();
+    }, 10 * 60 * 1000); // Every 10 minutes
+
+    console.log('[Daily Sync] Watchdog started (checks every 10 minutes)');
+  }
+
+  // Watchdog check: Verify sync is scheduled when it should be
+  async checkDailySyncWatchdog() {
+    const startTime = Date.now();
+    try {
+      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
+      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+      const isInActivePeriod = nowCET.isBetween(activeStart, activeEnd, null, '[]');
+      let actionTaken = null;
+
+      // If we're in active period but no timeout is scheduled, reschedule
+      if (isInActivePeriod && !this.dailySyncTimeout) {
+        console.warn('[Daily Sync Watchdog] ⚠️  In active period but no sync scheduled! Rescheduling...');
+        this.scheduleNextDailySyncCheck();
+        actionTaken = 'Rescheduled - no sync was scheduled';
+        const duration = Date.now() - startTime;
+        await logScheduledJob('Watchdog', 'success', actionTaken, duration);
+        return;
+      }
+
+      // If we're in active period and timeout exists, verify it's still valid
+      if (isInActivePeriod && this.dailySyncTimeout && this.dailySyncNextRun) {
+        const nextRun = moment(this.dailySyncNextRun);
+        const timeUntilNext = nextRun.diff(nowCET, 'minutes');
+        
+        // If next run is more than 10 minutes away, something might be wrong
+        if (timeUntilNext > 10) {
+          console.warn(`[Daily Sync Watchdog] ⚠️  Next run is ${timeUntilNext} minutes away, might be stuck. Rescheduling...`);
+          if (this.dailySyncTimeout) {
+            clearTimeout(this.dailySyncTimeout);
+            this.dailySyncTimeout = null;
+          }
+          this.scheduleNextCheckIn5Minutes();
+          actionTaken = `Rescheduled - next run was ${timeUntilNext} minutes away`;
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
+          return;
+        }
+
+        // If next run is in the past, reschedule
+        const nowUTC = moment().tz('UTC');
+        if (nextRun.isBefore(nowUTC)) {
+          console.warn('[Daily Sync Watchdog] ⚠️  Next run time is in the past! Rescheduling...');
+          if (this.dailySyncTimeout) {
+            clearTimeout(this.dailySyncTimeout);
+            this.dailySyncTimeout = null;
+          }
+          this.scheduleNextCheckIn5Minutes();
+          actionTaken = 'Rescheduled - next run was in the past';
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
+          return;
+        }
+      }
+
+      // Check if last sync check was too long ago (more than 15 minutes during active period)
+      if (isInActivePeriod && this.dailySyncLastCheck) {
+        const lastCheck = moment(this.dailySyncLastCheck);
+        const nowVilnius = moment().tz('Europe/Vilnius');
+        const minutesSinceLastCheck = nowVilnius.diff(lastCheck, 'minutes');
+        
+        if (minutesSinceLastCheck > 15) {
+          console.warn(`[Daily Sync Watchdog] ⚠️  Last check was ${minutesSinceLastCheck} minutes ago! Forcing check...`);
+          // Force a check now
+          await this.runDailySyncCheck();
+          actionTaken = `Forced check - last check was ${minutesSinceLastCheck} minutes ago`;
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
+          return;
+        }
+      }
+
+      // If we're in active period but suppressed, verify suppression is still valid
+      if (isInActivePeriod && this.dailySyncSuppressedDate) {
+        const today = moment().tz('Europe/Vilnius').format('YYYY-MM-DD');
+        if (this.dailySyncSuppressedDate !== today) {
+          console.log('[Daily Sync Watchdog] Suppression date changed, clearing suppression');
+          this.dailySyncSuppressedDate = null;
+          this.scheduleNextCheckIn5Minutes();
+          actionTaken = 'Cleared suppression - date changed';
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
+          return;
+        }
+      }
+
+      // No action needed - everything is OK
+      if (!actionTaken) {
+        const duration = Date.now() - startTime;
+        await logScheduledJob('Watchdog', 'success', 'No action needed - sync is healthy', duration);
+      }
+    } catch (error) {
+      console.error('[Daily Sync Watchdog] Error in watchdog check:', error);
+      const duration = Date.now() - startTime;
+      await logScheduledJob('Watchdog', 'error', error.message, duration);
+    }
+  }
+
+  // Fallback cron job: Runs every 15 minutes during active period as safety net
+  startDailySyncFallback() {
+    if (this.dailySyncFallbackCron) {
+      this.dailySyncFallbackCron.stop();
+    }
+
+    // Cron: every 15 minutes from 12:45 to 15:55 CET
+    const cronExpression = '45,0,15,30,45 12-15 * * *';
+    this.dailySyncFallbackCron = cron.schedule(cronExpression, async () => {
+      const startTime = Date.now();
+      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
+      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+      
+      // Only run if we're in active period
+      if (!nowCET.isBetween(activeStart, activeEnd, null, '[]')) {
+        return;
+      }
+
+      // Check if dynamic sync is working
+      const minutesSinceLastCheck = this.dailySyncLastCheck 
+        ? moment().tz('UTC').diff(moment(this.dailySyncLastCheck), 'minutes')
+        : 999;
+
+      // If last check was more than 10 minutes ago, force a check
+      if (minutesSinceLastCheck > 10) {
+        console.warn('[Daily Sync Fallback] ⚠️  Dynamic sync appears stuck, forcing check via fallback cron');
+        try {
+          await this.runDailySyncCheck();
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Fallback Cron', 'success', `Forced check - last check was ${minutesSinceLastCheck} minutes ago`, duration);
+        } catch (error) {
+          console.error('[Daily Sync Fallback] Error in fallback check:', error);
+          const duration = Date.now() - startTime;
+          await logScheduledJob('Fallback Cron', 'error', error.message, duration);
+        }
+      } else {
+        const duration = Date.now() - startTime;
+        console.log('[Daily Sync Fallback] Dynamic sync is working, skipping fallback');
+        await logScheduledJob('Fallback Cron', 'skipped', 'Dynamic sync is working, no action needed', duration);
+      }
+    }, {
+      scheduled: true,
+      timezone: 'Europe/Paris' // CET/CEST timezone
+    });
+
+    console.log('[Daily Sync] Fallback cron started (every 15 min during active period, 12:45-15:55 CET)');
+  }
+
+  // Schedule the next daily sync check (recursive, schedules itself)
+  scheduleNextDailySyncCheck() {
+    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+    const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
+    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+
+    // Check if we're in the active period
+    if (nowCET.isBefore(activeStart)) {
+      // Before active period - schedule for 12:45 CET
+      const msUntilStart = activeStart.diff(nowCET);
+      this.dailySyncNextRun = activeStart.toISOString();
+      this.dailySyncTimeout = setTimeout(() => {
+        this.runDailySyncCheck();
+      }, msUntilStart);
+      console.log(`[Daily Sync] Scheduled first check at 12:45 CET (in ${Math.round(msUntilStart / 1000 / 60)} minutes)`);
+      return;
+    }
+
+    if (nowCET.isAfter(activeEnd)) {
+      // After active period - schedule for tomorrow at 12:45 CET
+      const tomorrowStart = activeStart.clone().add(1, 'day');
+      const msUntilTomorrow = tomorrowStart.diff(nowCET);
+      this.dailySyncNextRun = tomorrowStart.toISOString();
+      this.dailySyncTimeout = setTimeout(() => {
+        this.scheduleNextDailySyncCheck();
+      }, msUntilTomorrow);
+      console.log(`[Daily Sync] Outside active period, scheduling for tomorrow 12:45 CET`);
+      return;
+    }
+
+    // We're in the active period - run check now, then schedule next one
+    this.runDailySyncCheck();
+  }
+
+  // Run a single daily sync check and schedule the next one
+  async runDailySyncCheck() {
+    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+    const startTime = Date.now();
+    
+    // Update last check timestamp (store in UTC for consistency)
+    this.dailySyncLastCheck = moment().tz('UTC').toISOString();
+
+    try {
+      // Check if we should suppress this run
+      if (await this.shouldSuppressDailySyncForToday()) {
+        console.log('[Daily Sync] Suppressed - today is already complete');
+        const duration = Date.now() - startTime;
+        await logScheduledJob('Daily Sync', 'skipped', 'Today is already complete, no sync needed', duration);
+        
+        // Still schedule next check in case data becomes incomplete
+        // But only if we're still in active period
+        if (nowCET.isBefore(activeEnd)) {
+          this.scheduleNextCheckIn5Minutes();
+        }
+        return;
+      }
+
+      console.log(`[Daily Sync] Running daily sync check at ${nowCET.format('HH:mm:ss')} CET...`);
+      try {
+        await this.checkRecentDataSyncByCompleteness();
+        const duration = Date.now() - startTime;
+        await logScheduledJob('Daily Sync', 'success', 'Daily sync check completed', duration);
+      } catch (error) {
+        console.error('[Daily Sync] Error during daily sync:', error.message);
+        const duration = Date.now() - startTime;
+        await logScheduledJob('Daily Sync', 'error', error.message, duration);
+        // Continue scheduling even on error
+      }
+
+      // Schedule next check in 5 minutes (if still in active period)
+      // Always schedule next check, even if there was an error
+      if (nowCET.isBefore(activeEnd)) {
+        this.scheduleNextCheckIn5Minutes();
+      } else {
+        console.log('[Daily Sync] Active period ended, stopping checks for today');
+        this.dailySyncNextRun = null;
+      }
+    } catch (error) {
+      // Critical error - log but ensure we reschedule
+      console.error('[Daily Sync] Critical error in runDailySyncCheck:', error);
+      const duration = Date.now() - startTime;
+      await logScheduledJob('Daily Sync', 'error', `Critical error: ${error.message}`, duration);
+      
+      // Try to reschedule if still in active period
+      if (nowCET.isBefore(activeEnd)) {
+        console.log('[Daily Sync] Attempting to reschedule after error...');
+        this.scheduleNextCheckIn5Minutes();
+      }
+    }
+  }
+
+  // Schedule the next check in exactly 5 minutes
+  scheduleNextCheckIn5Minutes() {
+    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+    const nextCheck = nowCET.clone().add(5, 'minutes');
+    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+
+    // If next check would be after active period, don't schedule
+    if (nextCheck.isAfter(activeEnd)) {
+      console.log('[Daily Sync] Next check would be after active period, stopping');
+      this.dailySyncNextRun = null;
+      return;
+    }
+
+    const msUntilNext = nextCheck.diff(nowCET);
+    this.dailySyncNextRun = nextCheck.toISOString();
+    this.dailySyncTimeout = setTimeout(() => {
+      this.runDailySyncCheck();
+    }, msUntilNext);
+    
+    console.log(`[Daily Sync] Next check scheduled at ${nextCheck.format('HH:mm:ss')} CET (in 5 minutes)`);
   }
 
   // Check for missed daily sync jobs on container restart
   async checkForMissedDailySync() {
     try {
-      const now = moment().tz('UTC');
-      const today = now.format('YYYY-MM-DD');
+      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+      const today = nowCET.format('YYYY-MM-DD');
       
-      // Only check if we're in the active period (12:45-16:00 UTC)
-      const activeStart = moment().tz('UTC').set({ hour: 12, minute: 45, second: 0, millisecond: 0 });
-      const activeEnd = moment().tz('UTC').set({ hour: 16, minute: 0, second: 0, millisecond: 0 });
+      // Only check if we're in the active period (12:45-15:55 CET)
+      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
+      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
       
-      if (now.isBetween(activeStart, activeEnd)) {
+      if (nowCET.isBetween(activeStart, activeEnd)) {
         console.log('[Daily Sync] Container started during active period, checking for missed sync...');
         
-        // Check if yesterday is complete
-        const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
-        const yesterdayStatus = await this.isDateComplete(yesterday);
-        
-        if (!yesterdayStatus.isComplete) {
-          console.log(`[Daily Sync] Yesterday (${yesterday}) is not complete. Running missed sync...`);
-          await this.syncFromLastAvailable();
-        } else {
-          console.log(`[Daily Sync] Yesterday (${yesterday}) is complete. No missed sync needed.`);
-        }
+        // Use country sync status to check if sync is needed
+        await this.checkRecentDataSyncByCompleteness();
       } else {
         // Outside active period - just check once if we need to sync
         console.log('[Daily Sync] Outside active period, checking once if sync needed...');
@@ -691,15 +1605,8 @@ class SyncWorker {
   // Check once outside active period if sync is needed
   async checkOnceOutsideActivePeriod() {
     try {
-      const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
-      const yesterdayStatus = await this.isDateComplete(yesterday);
-      
-      if (!yesterdayStatus.isComplete) {
-        console.log(`[Daily Sync] Yesterday (${yesterday}) is not complete. Running sync...`);
-        await this.syncFromLastAvailable();
-      } else {
-        console.log(`[Daily Sync] Yesterday (${yesterday}) is complete. No sync needed.`);
-      }
+      // Use country sync status instead of date completeness
+      await this.checkRecentDataSyncByCompleteness();
     } catch (error) {
       console.error('[Daily Sync] Error in outside period check:', error.message);
     }
@@ -736,7 +1643,7 @@ class SyncWorker {
       }
     }, {
       scheduled: false,
-      timezone: 'Europe/Vilnius'
+      timezone: 'Europe/Paris' // CET/CEST timezone
     });
     
     this.nextDaySyncJob.start();
@@ -747,6 +1654,7 @@ class SyncWorker {
   async runWeeklySync(description) {
     if (this.isRunning) {
       console.log(`${description} skipped - another sync is already running`);
+      await logScheduledJob('Weekly Sync', 'skipped', 'Another sync is already running');
       return;
     }
 
@@ -764,11 +1672,13 @@ class SyncWorker {
       
       // Log successful sync
       await this.logSync('weekly_sync', 'success', 0, 0, 0, null, duration);
+      await logScheduledJob('Weekly Sync', 'success', 'Weekly sync completed', duration);
       
     } catch (error) {
       console.error(`${description} failed:`, error.message);
       const duration = Date.now() - startTime;
       await this.logSync('weekly_sync', 'error', 0, 0, 0, error.message, duration);
+      await logScheduledJob('Weekly Sync', 'error', error.message, duration);
     } finally {
       this.isRunning = false;
     }
@@ -778,6 +1688,7 @@ class SyncWorker {
   async runNextDaySync(description) {
     if (this.isRunning) {
       console.log(`${description} skipped - another sync is already running`);
+      await logScheduledJob('Next Day Sync', 'skipped', 'Another sync is already running');
       return;
     }
 
@@ -793,16 +1704,22 @@ class SyncWorker {
       
       if (needsNextDaySync) {
         await this.syncFromLastAvailable(); // Use simple sync logic
+        const duration = Date.now() - startTime;
         console.log(`${description} completed - next day data synced`);
-        await this.logSync('nextday_sync', 'success', 0, 0, 0, 'Next day data synced', Date.now() - startTime);
+        await this.logSync('nextday_sync', 'success', 0, 0, 0, 'Next day data synced', duration);
+        await logScheduledJob('Next Day Sync', 'success', 'Next day data synced', duration);
       } else {
+        const duration = Date.now() - startTime;
         console.log(`${description} skipped - next day data already available`);
-        await this.logSync('nextday_sync', 'skipped', 0, 0, 0, 'Next day data already available');
+        await this.logSync('nextday_sync', 'skipped', 0, 0, 0, 'Next day data already available', duration);
+        await logScheduledJob('Next Day Sync', 'skipped', 'Next day data already available', duration);
       }
       
     } catch (error) {
+      const duration = Date.now() - startTime;
       console.error(`${description} failed:`, error.message);
-      await this.logSync('nextday_sync', 'error', 0, 0, 0, error.message, Date.now() - startTime);
+      await this.logSync('nextday_sync', 'error', 0, 0, 0, error.message, duration);
+      await logScheduledJob('Next Day Sync', 'error', error.message, duration);
     } finally {
       this.isRunning = false;
     }
@@ -896,10 +1813,10 @@ class SyncWorker {
         return 0;
       }
       
-      const records = await this.insertPriceData(priceData, country);
-      console.log(`Synced ${records} records for ${country.toUpperCase()}`);
+      const result = await this.insertPriceData(priceData, country);
+      console.log(`Synced ${result.insertedCount} records for ${country.toUpperCase()}`);
       
-      return records;
+      return result.insertedCount;
     } catch (error) {
       console.error(`Error syncing ${country.toUpperCase()}:`, error.message);
       
@@ -928,15 +1845,29 @@ class SyncWorker {
       `;
       
       let insertedCount = 0;
+      let maxTimestamp = null;
+      
       for (const data of priceData) {
-        // Calculate UTC date from timestamp
-        const date = new Date(data.timestamp * 1000).toISOString().slice(0, 10);
+        // Calculate date in CET/EET timezone (Europe/Vilnius) from timestamp
+        // Nord Pool data is published in CET/EET, so we should use that timezone for date calculation
+        const timestampMoment = moment.unix(data.timestamp).tz('Europe/Vilnius');
+        const date = timestampMoment.format('YYYY-MM-DD');
         await client.query(insertQuery, [data.timestamp, data.price, country, date]);
         insertedCount++;
+        
+        // Track max timestamp
+        if (!maxTimestamp || data.timestamp > maxTimestamp) {
+          maxTimestamp = data.timestamp;
+        }
       }
       
       await client.query('COMMIT');
-      return insertedCount;
+      
+      // Return maxTimestamp so caller can update sync status after all countries are synced
+      return {
+        insertedCount,
+        maxTimestamp
+      };
     } catch (err) {
       await client.query('ROLLBACK');
       console.error('Error inserting price data:', err);
@@ -967,10 +1898,32 @@ class SyncWorker {
       console.log('Stopped next day sync job');
     }
     
-    // Stop daily sync jobs
+    // Stop daily sync timeout
+    if (this.dailySyncTimeout) {
+      clearTimeout(this.dailySyncTimeout);
+      this.dailySyncTimeout = null;
+      this.dailySyncNextRun = null;
+      console.log('Stopped daily sync timeout');
+    }
+    
+    // Stop watchdog
+    if (this.dailySyncWatchdogInterval) {
+      clearInterval(this.dailySyncWatchdogInterval);
+      this.dailySyncWatchdogInterval = null;
+      console.log('Stopped daily sync watchdog');
+    }
+    
+    // Stop fallback cron
+    if (this.dailySyncFallbackCron) {
+      this.dailySyncFallbackCron.stop();
+      this.dailySyncFallbackCron = null;
+      console.log('Stopped daily sync fallback cron');
+    }
+    
+    // Stop daily sync jobs (legacy cron jobs, if any)
     if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
       this.dailySyncJobs.forEach(job => job.stop());
-      console.log('Stopped daily sync jobs');
+      console.log('Stopped daily sync cron jobs');
     }
     
     // Stop health monitoring
@@ -983,43 +1936,139 @@ class SyncWorker {
     console.log('Sync worker stopped');
   }
 
+  // Calculate next run time for a cron expression
+  getNextRunTime(cronExpression, timezone) {
+    try {
+      const now = moment().tz(timezone);
+      
+      // Parse cron expression manually for our specific patterns
+      if (cronExpression === '0 2 * * 0') {
+        // Weekly sync: Every Sunday at 2 AM
+        let nextRun = now.clone().day(0).hour(2).minute(0).second(0).millisecond(0);
+        if (nextRun.isBefore(now) || (nextRun.isSame(now, 'day') && now.hour() >= 2)) {
+          nextRun = nextRun.add(1, 'week');
+        }
+        return nextRun.toISOString();
+      }
+      
+      if (cronExpression === '30 13 * * *') {
+        // Next day sync: Every day at 13:30 CET
+        let nextRun = now.clone().hour(13).minute(30).second(0).millisecond(0);
+        if (nextRun.isBefore(now)) {
+          nextRun = nextRun.add(1, 'day');
+        }
+        return nextRun.toISOString();
+      }
+      
+      // Daily sync: 45,50,55 12 * * *; */5 13-15 * * * (in CET timezone)
+      if (cronExpression.includes('45,50,55 12') || cronExpression.includes('*/5 13-15')) {
+        const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+        const candidates = [];
+        
+        // First cron: 12:45, 12:50, 12:55 CET
+        if (nowCET.hour() < 12 || (nowCET.hour() === 12 && nowCET.minute() < 45)) {
+          // Before 12:45 today
+          candidates.push(nowCET.clone().hour(12).minute(45).second(0).millisecond(0));
+        } else if (nowCET.hour() === 12) {
+          if (nowCET.minute() < 50) {
+            candidates.push(nowCET.clone().minute(50).second(0).millisecond(0));
+          } else if (nowCET.minute() < 55) {
+            candidates.push(nowCET.clone().minute(55).second(0).millisecond(0));
+          } else {
+            // After 12:55, next is 13:00
+            candidates.push(nowCET.clone().hour(13).minute(0).second(0).millisecond(0));
+          }
+        }
+        
+        // Second cron: */5 13-15 (every 5 minutes from 13:00 to 15:55 CET)
+        if (nowCET.hour() >= 13 && nowCET.hour() <= 15) {
+          const currentMinute = nowCET.minute();
+          let nextMinute = Math.ceil((currentMinute + 1) / 5) * 5;
+          
+          if (nextMinute >= 60) {
+            // Next hour
+            if (nowCET.hour() < 15) {
+              candidates.push(nowCET.clone().add(1, 'hour').minute(0).second(0).millisecond(0));
+            }
+          } else if (nowCET.hour() === 15 && nextMinute > 55) {
+            // Past 15:55, next is tomorrow
+            candidates.push(nowCET.clone().add(1, 'day').hour(12).minute(45).second(0).millisecond(0));
+          } else {
+            candidates.push(nowCET.clone().minute(nextMinute).second(0).millisecond(0));
+          }
+        } else if (nowCET.hour() < 13) {
+          // Before 13:00, next is 13:00
+          candidates.push(nowCET.clone().hour(13).minute(0).second(0).millisecond(0));
+        }
+        
+        // If no candidates for today, next is tomorrow at 12:45 CET
+        if (candidates.length === 0 || nowCET.hour() > 15 || (nowCET.hour() === 15 && nowCET.minute() > 55)) {
+          candidates.push(nowCET.clone().add(1, 'day').hour(12).minute(45).second(0).millisecond(0));
+        }
+        
+        // Return the earliest candidate
+        if (candidates.length > 0) {
+          const earliest = candidates.reduce((earliest, current) => 
+            moment(current).isBefore(moment(earliest)) ? current : earliest
+          );
+          return moment(earliest).toISOString();
+        }
+        
+        return nowCET.clone().add(1, 'day').hour(12).minute(45).second(0).millisecond(0).toISOString();
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error calculating next run time:', error);
+      return null;
+    }
+  }
+
   // Get scheduled job information
   getScheduledJobs() {
     const jobs = [];
     
-    // Daily sync jobs
-    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
-      jobs.push({
-        name: 'Daily Sync',
-        cron: '45,50,55 12 * * *; */5 13-15 * * *',
-        timezone: 'UTC',
-        description: 'Every 5 minutes from 12:45 to 15:55 UTC',
-        running: this.dailySyncJobs.some(job => job.running),
-        nextRun: this.dailySyncJobs.map(job => job.nextDate ? job.nextDate().toISOString() : null).filter(Boolean).sort()[0] || null
-      });
-    }
+    // Daily sync (using dynamic setTimeout)
+    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+    const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
+    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
+    const isInActivePeriod = nowCET.isBetween(activeStart, activeEnd, null, '[]');
+    
+    jobs.push({
+      name: 'Daily Sync',
+      cron: 'Dynamic (every 5 min) + Fallback (every 15 min)',
+      timezone: 'Europe/Paris',
+      description: 'Every 5 minutes from 12:45 to 15:55 CET (dynamic scheduling with watchdog)',
+      running: this.dailySyncTimeout !== null || (isInActivePeriod && this.dailySyncFallbackCron),
+      nextRun: this.dailySyncNextRun || this.getNextRunTime('45,50,55 12 * * *; */5 13-15 * * *', 'Europe/Paris'),
+      lastCheck: this.dailySyncLastCheck,
+      watchdogActive: this.dailySyncWatchdogInterval !== null,
+      fallbackActive: this.dailySyncFallbackCron !== null
+    });
     
     // Weekly sync job
     if (this.weeklySyncJob) {
+      const nextRun = this.getNextRunTime('0 2 * * 0', 'Europe/Vilnius');
       jobs.push({
         name: 'Weekly Sync',
         cron: '0 2 * * 0',
         timezone: 'Europe/Vilnius',
         description: 'Every Sunday at 2 AM CET',
         running: this.weeklySyncJob.running,
-        nextRun: this.weeklySyncJob.nextDate ? this.weeklySyncJob.nextDate().toISOString() : null
+        nextRun: nextRun
       });
     }
     
     // Next day sync job
     if (this.nextDaySyncJob) {
+      const nextRun = this.getNextRunTime('30 13 * * *', 'Europe/Paris');
       jobs.push({
         name: 'Next Day Sync',
         cron: '30 13 * * *',
-        timezone: 'Europe/Vilnius',
+        timezone: 'Europe/Paris',
         description: 'Every day at 13:30 CET',
         running: this.nextDaySyncJob.running,
-        nextRun: this.nextDaySyncJob.nextDate ? this.nextDaySyncJob.nextDate().toISOString() : null
+        nextRun: nextRun
       });
     }
     
@@ -1151,8 +2200,8 @@ class SyncWorker {
         const countryData = allCountriesData[country];
         if (countryData && countryData.length > 0) {
           console.log(`Processing ${country.toUpperCase()}: ${countryData.length} records`);
-          const recordsCreated = await this.insertPriceData(countryData, country);
-          totalRecords += recordsCreated;
+          const result = await this.insertPriceData(countryData, country);
+          totalRecords += result.insertedCount;
         }
       }
       
@@ -1190,12 +2239,12 @@ class SyncWorker {
         return 0;
       }
       
-      const recordsCreated = await this.insertPriceData(countryData, country);
+      const result = await this.insertPriceData(countryData, country);
       const duration = Date.now() - startTime;
-      console.log(`Historical chunk sync completed: ${recordsCreated} records in ${duration}ms`);
+      console.log(`Historical chunk sync completed: ${result.insertedCount} records in ${duration}ms`);
       
-      await this.logSync('historical_chunk', 'success', countryData.length, recordsCreated, 0, null, duration);
-      return recordsCreated;
+      await this.logSync('historical_chunk', 'success', countryData.length, result.insertedCount, 0, null, duration);
+      return result.insertedCount;
     } catch (error) {
       console.error('Historical chunk sync failed:', error);
       const duration = Date.now() - startTime;
@@ -1353,8 +2402,8 @@ class SyncWorker {
         const countryData = allCountriesData[country];
         if (countryData && countryData.length > 0) {
           console.log(`[Efficient Sync] Storing ${country.toUpperCase()}: ${countryData.length} records`);
-          const recordsCreated = await this.insertPriceData(countryData, country);
-          totalRecords += recordsCreated;
+          const result = await this.insertPriceData(countryData, country);
+          totalRecords += result.insertedCount;
         }
       }
       

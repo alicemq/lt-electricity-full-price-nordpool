@@ -90,11 +90,12 @@
 - ✅ **Environment support** - Dev/prod configurations with override files
 - ✅ **Easy deployment** - One command to start entire system
 
-### **5. DST-Aware Data Handling**
+### **5. DST- and MTU-Aware Data Handling**
 - ✅ **Proper timezone conversion** for electricity markets
 - ✅ **NordPool time boundaries** - 22:00 UTC to 21:59 UTC
-- ✅ **User-friendly display** - Local timezone presentation
-- ✅ **Database optimization** - Efficient timestamp queries
+- ✅ **Support for multiple Market Time Units (MTU)** - handles historical 60-minute slots and new 15-minute MTU from Nord Pool ([MTU transition](https://www.nordpoolgroup.com/en/trading/transition-to-15-minute-market-time-unit-mtu/))
+- ✅ **User-friendly display** - Local timezone presentation with dynamic interval labels (e.g. 00:15–00:30)
+- ✅ **Database optimization** - Efficient timestamp queries across mixed resolutions
 
 ### **6. API Routing Implementation**
 - ✅ **Development proxy** - Vite dev server proxies API calls to backend
@@ -336,7 +337,6 @@ curl "http://localhost:5173/api/"                           # Development
 - [x] **Enhanced Swagger UI Integration - COMPLETED**
   - [x] Complete OpenAPI specification documentation
   - [x] Interactive API testing interface
-  - [x] Auto-generated client SDKs
   - [x] Production-ready integration
   - [x] Enhanced documentation with rich descriptions
 
@@ -401,45 +401,17 @@ curl "http://localhost:5173/api/"                           # Development
   - [ ] Pattern recognition
   - [ ] Automated insights
 
-## 📊 **Swagger UI & SDK Generation**
+## 📊 **Swagger UI**
 
 ### **Current Implementation Status**
 - [x] **Complete OpenAPI 3.0.3 Specification** - Comprehensive API documentation
 - [x] **Interactive Testing Interface** - Try-it-out functionality for all endpoints
-- [x] **Multi-language SDK Generation** - Support for 7+ programming languages
 - [x] **Production Security** - Internal service with proxy access only
 - [x] **Enhanced Documentation** - Rich descriptions, examples, and usage patterns
-
-### **Available SDKs**
-The system includes an automated SDK generation script (`scripts/generate-sdks.sh`) that creates client libraries for:
-
-1. **JavaScript/TypeScript** - Full type safety and Promise-based API
-2. **Python** - Native Python client with type hints
-3. **Java** - Maven-ready Java client library
-4. **C#** - .NET client with async/await support
-5. **Go** - Native Go client with context support
-6. **PHP** - Composer-ready PHP client
-7. **Additional languages** - Extensible for other OpenAPI Generator targets
-
-### **SDK Generation Usage**
-```bash
-# Generate all SDKs
-./scripts/generate-sdks.sh
-
-# Generated SDKs will be available in:
-# - generated-sdks/javascript/
-# - generated-sdks/typescript/
-# - generated-sdks/python/
-# - generated-sdks/java/
-# - generated-sdks/csharp/
-# - generated-sdks/go/
-# - generated-sdks/php/
-```
 
 ### **API Documentation Access**
 - **Interactive Swagger UI**: `http://localhost/api/` (production) or `http://localhost:5173/api/` (development)
 - **OpenAPI Specification**: `http://localhost/api/openapi.yaml`
-- **Generated SDKs**: `./generated-sdks/` directory with usage examples
 
 ### **Enhanced Features**
 - **Rich API Descriptions** - Comprehensive documentation with usage examples

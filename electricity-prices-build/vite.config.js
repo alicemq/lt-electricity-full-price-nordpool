@@ -2,13 +2,11 @@ import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
   ],
   resolve: {
     alias: {
@@ -32,10 +30,9 @@ export default defineConfig({
         }
       },
       '/api': {
-        target: 'http://swagger-ui:8080/swagger',
+        target: 'http://swagger-ui:8080',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log(`[${new Date().toISOString()}] Proxying to Swagger UI: ${req.method} ${req.url} -> ${options.target}${proxyReq.path}`);

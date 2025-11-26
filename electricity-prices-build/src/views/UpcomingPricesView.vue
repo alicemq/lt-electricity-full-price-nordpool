@@ -1,10 +1,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import PriceTable from '../components/PriceTable.vue';
-import { fetchPrices } from '../services/priceService';
+import { fetchUpcomingPrices } from '../services/priceService';
 import { calculatePrice } from '../services/priceCalculationService';
 import { formatPriceHours, formatLocalTime } from '../services/timeService';
 import moment from 'moment-timezone';
+
+moment.tz.setDefault('Europe/Vilnius');
 
 const priceData = ref([]);
 const allPrices = ref([]);
@@ -13,15 +15,24 @@ const error = ref(null);
 
 let refreshTimeout = null;
 
+function getIntervalMs() {
+  if (allPrices.value && allPrices.value.length >= 2) {
+    const diffSec = allPrices.value[1].timestamp - allPrices.value[0].timestamp;
+    if (diffSec > 0) return diffSec * 1000;
+  }
+  return 60 * 60 * 1000; // default 1 hour
+}
+
 function scheduleNextRefresh() {
-  // Clear any existing timeout
   if (refreshTimeout) clearTimeout(refreshTimeout);
-  const now = new Date();
-  const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+  const intervalMs = getIntervalMs();
+  const now = Date.now();
+  const nextBoundary = now - (now % intervalMs) + intervalMs;
+  const delay = Math.max(nextBoundary - now, 5 * 1000);
   refreshTimeout = setTimeout(async () => {
     await loadPrices();
     scheduleNextRefresh();
-  }, msToNextHour);
+  }, delay);
 }
 
 function handleVisibilityChange() {
@@ -36,40 +47,24 @@ const loadPrices = async () => {
   try {
     isLoading.value = true;
     
-    const today = moment();
-    const data = await fetchPrices(today);
+    const data = await fetchUpcomingPrices('lt');
+    const upcoming = data?.data?.lt || [];
     
-    const tomorrow = moment().add(1, 'days');
-    const tomorrowData = await fetchPrices(tomorrow);
-    
-    const todayPrices = data?.data?.lt || [];
-    const tomorrowPrices = tomorrowData?.data?.lt || [];
-    
-    // Store all prices for average calculation
-    const combined = [...todayPrices, ...tomorrowPrices]
+    allPrices.value = upcoming
       .filter(price => price !== null && price !== undefined)
-      .sort((a, b) => new Date(a.timestamp * 1000) - new Date(b.timestamp * 1000));
+      .sort((a, b) => a.timestamp - b.timestamp);
     
-    allPrices.value = combined;
+    priceData.value = allPrices.value;
     
-    // Filter using the current moment in time for more accurate filtering
-    const now = moment();
-    
-    const upcomingPrices = combined.filter(price => {
-      // Convert timestamp to moment object for proper comparison
-      const priceTime = moment(price.timestamp * 1000);
-      
-      // Use moment's isAfter or isSame for precise time comparison
-      return priceTime.isSameOrAfter(now, 'hour');
-    });
-    
-    priceData.value = upcomingPrices;
-    
-    // Log calculated price objects with properly formatted local date time
     console.log('Calculated Price Objects:');
+    const intervalSeconds =
+      allPrices.value.length >= 2
+        ? Math.max(allPrices.value[1].timestamp - allPrices.value[0].timestamp, 60)
+        : 3600;
+
     const calculatedPrices = priceData.value.map(price => ({
       timestamp: price.timestamp,
-      formattedTime: formatPriceHours(price.timestamp, 1),
+      formattedTime: formatPriceHours(price.timestamp, intervalSeconds),
       localDateTime: formatLocalTime(price.timestamp),
       rawPrice: price.price,
       calculatedPrice: calculatePrice(price)
@@ -99,17 +94,15 @@ onUnmounted(() => {
 
 <template>
   <div class="container">
-    <h1 class="mb-3">Upcoming Prices</h1>
-    
     <!-- Loading and error states -->
     <div v-if="isLoading" class="alert alert-info">
-      Loading prices...
+      {{ $t('upcoming.loading') }}
     </div>
     <div v-else-if="error" class="alert alert-danger">
-      {{ error }}
+      {{ $t('upcoming.error') }}
     </div>
     <div v-else-if="priceData.length === 0" class="alert alert-warning">
-      No upcoming prices available.
+      {{ $t('upcoming.empty') }}
     </div>
     <div v-else>
       <PriceTable :priceData="priceData" :allPriceData="allPrices" />

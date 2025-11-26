@@ -61,7 +61,7 @@ Content-Type: application/json
 ```
 
 **Parameters:**
-- `country` (string, required): Country code (`lt`, `ee`, `lv`, `fi`, `all`)
+- `country` (string, optional): Country code (`lt`, `ee`, `lv`, `fi`). If omitted, returns data for all countries (where supported).
 - `days` (number, required): Number of days to sync (1-30)
 
 **Response:**
@@ -163,6 +163,7 @@ Content-Type: application/json
 
 ### Get Prices for Single Date
 Retrieve electricity prices for a specific date.
+Returns one record per market time unit (MTU), which MAY be either 60-minute (legacy data) or 15-minute (new MTU) depending on the source data for that day.
 
 ```http
 GET /api/v1/nps/prices/{date}
@@ -196,6 +197,7 @@ GET /api/v1/nps/prices/{date}
 
 ### Get Prices for Date Range
 Retrieve electricity prices for a date range.
+Each date in the range returns one record per MTU (hourly or 15-minute), rather than assuming a fixed 24 records per day.
 
 ```http
 GET /api/v1/nps/prices/{startDate}/{endDate}
@@ -228,7 +230,7 @@ GET /api/v1/nps/prices/{startDate}/{endDate}
 ```
 
 ### Get Latest Price for Country
-Get the latest available price for a specific country.
+Get the latest available price for a specific country (latest MTU up to now, independent of whether the underlying data is hourly or 15-minute).
 
 ```http
 GET /api/v1/nps/price/{country}/latest
@@ -247,8 +249,42 @@ GET /api/v1/nps/price/{country}/latest
 }
 ```
 
-### Get Current Hour Price
-Get the price for the current hour.
+### Get Current Interval Price
+Get the price for the **current MTU interval** (for example, the current 15‑minute slot once Nord Pool 15-minute MTU is in effect).
+
+### Get Upcoming Prices
+Retrieve upcoming electricity prices from the current MTU to the end of today and tomorrow (Europe/Vilnius timezone).
+
+```http
+GET /api/v1/nps/prices/upcoming?country={country}
+```
+
+**Parameters:**
+- `country` (string, optional): Country code (`lt`, `ee`, `lv`, `fi`), defaults to `lt`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "lt": [
+      { "timestamp": 1750932000, "price": 75.0 },
+      { "timestamp": 1750932900, "price": 68.5 }
+    ]
+  },
+  "meta": {
+    "country": "lt",
+    "count": 2,
+    "timezone": "Europe/Vilnius",
+    "intervalSeconds": 900,
+    "current_time_local": "2025-06-26 12:07:00",
+    "date_range": {
+      "start": "2025-06-26",
+      "end": "2025-06-27"
+    }
+  }
+}
+```
 
 ```http
 GET /api/v1/nps/price/{country}/current

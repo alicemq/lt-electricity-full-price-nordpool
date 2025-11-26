@@ -44,9 +44,9 @@ info:
     description: 'Project Documentation'
     url: 'https://github.com/your-repo/electricity-prices/blob/main/README.md'
 servers:
-  - url: 'http://localhost:3000/api'
+  - url: 'http://localhost:3000/api/v1'
     description: 'Development API Server'
-  - url: 'http://backend:3000/api'
+  - url: 'http://backend:3000/api/v1'
     description: 'Docker Internal API Server'
   - url: /api/v1
     description: 'Production API Server (via proxy)'
@@ -187,8 +187,11 @@ paths:
                 $ref: '#/components/schemas/Error'
   /nps/price/{country}/current:
     get:
-      summary: 'Get current hour price for a country'
-      description: 'Get electricity price for the current hour in Europe/Vilnius timezone'
+      summary: 'Get current interval price for a country'
+      description: |
+        Get electricity price for the current market time unit (MTU) in Europe/Vilnius timezone.
+
+        The API returns the latest available slot up to "now", regardless of whether the underlying data is in legacy 60-minute resolution or new 15-minute MTU.
       tags:
         - Prices
       parameters:
@@ -201,7 +204,7 @@ paths:
           description: 'Country code (case insensitive) or "all" for all countries'
       responses:
         '200':
-          description: 'Current hour price data'
+          description: 'Current interval price data'
           content:
             application/json:
               schema:
@@ -233,7 +236,7 @@ paths:
                   timezone: 'Europe/Vilnius'
                   timestamp_local: 1750885200
                   price_unit: 'EUR/MWh'
-                  data_type: 'current_hour'
+                  data_type: 'current_interval'
                   current_time_local: '2025-06-26 00:15:30'
                   is_current_hour: true
         '404':
@@ -257,12 +260,12 @@ paths:
         **Usage Examples:**
         - Single day: `?date=2025-06-26&country=lt`
         - Date range: `?start=2025-06-01&end=2025-06-30&country=ee`
-        - All countries: `?date=2025-06-26` (defaults to LT)
+        - All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)
         
         **Response Format:**
-        - 24 hourly prices per day
+        - One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)
         - Prices in EUR/MWh
-        - Unix timestamps for easy processing
+        - Unix timestamps (seconds) for easy processing
       tags:
         - Prices
       parameters:
@@ -292,8 +295,7 @@ paths:
           schema:
             type: string
             enum: [lt, ee, lv, fi]
-            default: lt
-          description: 'Country code (defaults to Lithuania if not specified)'
+          description: 'Country code (case insensitive). If omitted, returns data for all countries.'
       responses:
         '200':
           description: 'Price data for the specified period'
@@ -320,13 +322,17 @@ paths:
                         example: '2025-06-26'
                       country:
                         type: string
-                        example: 'lt'
+                        example: 'all'
                       count:
                         type: integer
-                        example: 24
+                        example: 96
                       timezone:
                         type: string
                         example: 'Europe/Vilnius'
+                      intervalSeconds:
+                        type: integer
+                        description: 'Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)'
+                        example: 900
                       total_records:
                         type: integer
                         example: 24
@@ -355,9 +361,43 @@ paths:
                     meta:
                       date: '2025-06-26'
                       country: 'lt'
-                      count: 3
+                      count: 24
                       timezone: 'Europe/Vilnius'
-                      total_records: 24
+                      intervalSeconds: 3600
+                      date_range:
+                        start: '2025-06-26'
+                        end: '2025-06-26'
+                all_countries:
+                  summary: 'Single day prices for all countries'
+                  value:
+                    success: true
+                    data:
+                      lt:
+                        - timestamp: 1750885200
+                          price: 75.0
+                        - timestamp: 1750888800
+                          price: 68.5
+                      ee:
+                        - timestamp: 1750885200
+                          price: 78.2
+                        - timestamp: 1750888800
+                          price: 71.3
+                      lv:
+                        - timestamp: 1750885200
+                          price: 76.5
+                        - timestamp: 1750888800
+                          price: 69.8
+                      fi:
+                        - timestamp: 1750885200
+                          price: 72.1
+                        - timestamp: 1750888800
+                          price: 65.4
+                    meta:
+                      date: '2025-06-26'
+                      country: 'all'
+                      count: 96
+                      timezone: 'Europe/Vilnius'
+                      intervalSeconds: 3600
                       date_range:
                         start: '2025-06-26'
                         end: '2025-06-26'
@@ -372,14 +412,14 @@ paths:
                         - timestamp: 1750888800
                           price: 71.3
                     meta:
-                      date: '2025-06-26'
+                      date: '2025-06-01 to 2025-06-30'
                       country: 'ee'
-                      count: 2
+                      count: 720
                       timezone: 'Europe/Vilnius'
-                      total_records: 48
+                      intervalSeconds: 3600
                       date_range:
-                        start: '2025-06-26'
-                        end: '2025-06-27'
+                        start: '2025-06-01'
+                        end: '2025-06-30'
         '400':
           description: 'Invalid parameters (missing required parameters or invalid date format)'
           content:
@@ -399,6 +439,95 @@ paths:
               example:
                 success: false
                 error: 'No price data found for the specified date range'
+                code: 'NO_DATA_FOUND'
+  /nps/prices/upcoming:
+    get:
+      summary: 'Get upcoming prices from current interval'
+      description: |
+        Retrieve upcoming electricity prices from the current market time unit (MTU) onward.
+
+        This endpoint returns all future slots from "now" until the end of today and tomorrow (Europe/Vilnius timezone),
+        using one record per MTU (hourly or 15-minute).
+      tags:
+        - Prices
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+            enum: [lt, ee, lv, fi]
+            default: lt
+          description: 'Country code (defaults to Lithuania if not specified)'
+      responses:
+        '200':
+          description: 'Upcoming price data from current MTU to end of tomorrow'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/PriceData'
+                  meta:
+                    type: object
+                    properties:
+                      country:
+                        type: string
+                        example: 'lt'
+                      count:
+                        type: integer
+                        example: 48
+                      timezone:
+                        type: string
+                        example: 'Europe/Vilnius'
+                      intervalSeconds:
+                        type: integer
+                        example: 900
+                      current_time_local:
+                        type: string
+                        example: '2025-06-26 12:07:00'
+                      date_range:
+                        type: object
+                        properties:
+                          start:
+                            type: string
+                            example: '2025-06-26'
+                          end:
+                            type: string
+                            example: '2025-06-27'
+              example:
+                success: true
+                data:
+                  lt:
+                    - timestamp: 1750932000
+                      price: 75.0
+                    - timestamp: 1750932900
+                      price: 68.5
+                meta:
+                  country: 'lt'
+                  count: 2
+                  timezone: 'Europe/Vilnius'
+                  intervalSeconds: 900
+                  current_time_local: '2025-06-26 12:07:00'
+                  date_range:
+                    start: '2025-06-26'
+                    end: '2025-06-27'
+        '404':
+          description: 'No upcoming price data available'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error: 'No upcoming price data available'
                 code: 'NO_DATA_FOUND'
   /latest:
     get:
@@ -485,6 +614,192 @@ paths:
                 message: 'Initial sync status reset successfully. Restart the backend to trigger initial sync.'
         '500':
           description: 'Failed to reset initial sync status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /configurations:
+    get:
+      summary: 'Get price configurations and system charges'
+      description: |
+        Retrieve electricity tariff configurations and system charges for price calculations.
+        
+        **Features:**
+        - Multi-country support (LT, EE, LV, FI)
+        - Historical tariff data grouped by effective date
+        - System charges (VIAP, distributionplus, etc.)
+        - Optimized for frontend caching
+        
+        **Usage Examples:**
+        - Single country: `?country=lt`
+        - All countries: (omit country parameter)
+        
+        **Response Format:**
+        - Tariffs grouped by country, then by effective date, then by zone and plan
+        - System charges grouped by country, then by effective date
+        - Data structure optimized for date-based lookups
+      tags:
+        - Configuration
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+            enum: [lt, ee, lv, fi]
+          description: 'Country code (case insensitive). If omitted, returns data for all countries.'
+      responses:
+        '200':
+          description: 'Price configurations and system charges'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      tariffs:
+                        type: object
+                        description: 'Tariffs grouped by country, then effective date, then zone and plan'
+                        additionalProperties:
+                          type: object
+                          description: 'Country code (lt, ee, lv, fi)'
+                          additionalProperties:
+                            type: object
+                            description: 'Effective date (YYYY-MM-DD)'
+                            additionalProperties:
+                              type: object
+                              description: 'Zone name (Four zones, Two zones, Single zone)'
+                              additionalProperties:
+                                type: object
+                                description: 'Plan name (Standart, Smart, Effective, Home, etc.)'
+                                additionalProperties:
+                                  type: number
+                                  description: 'Price for time period (morning, day, evening, night)'
+                      systemCharges:
+                        type: object
+                        description: 'System charges grouped by country, then effective date'
+                        additionalProperties:
+                          type: object
+                          description: 'Country code (lt, ee, lv, fi)'
+                          additionalProperties:
+                            type: object
+                            description: 'Effective date (YYYY-MM-DD)'
+                            additionalProperties:
+                              type: number
+                              description: 'Charge amount (VIAP, distributionplus, etc.)'
+                  meta:
+                    type: object
+                    properties:
+                      country:
+                        type: string
+                        description: 'Requested country or "all"'
+                        example: 'lt'
+                      count:
+                        type: integer
+                        description: 'Number of countries in response'
+                        example: 1
+              examples:
+                single_country:
+                  summary: 'Price configurations for Lithuania'
+                  value:
+                    success: true
+                    data:
+                      tariffs:
+                        lt:
+                          '2023-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.06534
+                                day: 0.07986
+                                evening: 0.10648
+                                night: 0.05203
+                            'Two zones':
+                              Standart:
+                                day: 0.09680
+                                night: 0.05687
+                          '2024-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.07502
+                                day: 0.09438
+                                evening: 0.12826
+                                night: 0.05929
+                      systemCharges:
+                        lt:
+                          '2024-01-01':
+                            VIAP: 0.00
+                            distributionplus: 0.00045
+                          '2025-01-01':
+                            VIAP: -0.00039
+                            distributionplus: 0.000893
+                    meta:
+                      country: 'lt'
+                      count: 1
+                all_countries:
+                  summary: 'Price configurations for all countries'
+                  value:
+                    success: true
+                    data:
+                      tariffs:
+                        lt:
+                          '2023-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.06534
+                                day: 0.07986
+                                evening: 0.10648
+                                night: 0.05203
+                        ee:
+                          '2023-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.06534
+                                day: 0.07986
+                                evening: 0.10648
+                                night: 0.05203
+                        lv:
+                          '2023-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.06534
+                                day: 0.07986
+                                evening: 0.10648
+                                night: 0.05203
+                        fi:
+                          '2023-01-01':
+                            'Four zones':
+                              Smart:
+                                morning: 0.06534
+                                day: 0.07986
+                                evening: 0.10648
+                                night: 0.05203
+                      systemCharges:
+                        lt:
+                          '2024-01-01':
+                            VIAP: 0.00
+                            distributionplus: 0.00045
+                        ee:
+                          '2024-01-01':
+                            VIAP: 0.00
+                            distributionplus: 0.00045
+                        lv:
+                          '2024-01-01':
+                            VIAP: 0.00
+                            distributionplus: 0.00045
+                        fi:
+                          '2024-01-01':
+                            VIAP: 0.00
+                            distributionplus: 0.00045
+                    meta:
+                      country: 'all'
+                      count: 4
+        '500':
+          description: 'Failed to fetch configurations'
           content:
             application/json:
               schema:
@@ -699,3 +1014,5 @@ tags:
     description: 'System health and status endpoints'
   - name: Countries
     description: 'Country information endpoints' 
+  - name: Configuration
+    description: 'Price configuration and tariff endpoints' 

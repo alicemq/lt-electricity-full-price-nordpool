@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import TodayView from '../views/TodayView.vue'
 import UpcomingPrices from '../components/UpcomingPrices.vue'
 
 const router = createRouter({
@@ -7,8 +7,12 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      redirect: '/upcoming'
+    },
+    {
+      path: '/today',
       name: 'today',
-      component: HomeView
+      component: TodayView
     },
     {
       path: '/settings',
@@ -37,6 +41,14 @@ const router = createRouter({
       component: () => import('../views/StatusView.vue'),
       meta: {
         title: 'System Status'
+      }
+    },
+    {
+      path: '/about',
+      name: 'about',
+      component: () => import('../views/AboutView.vue'),
+      meta: {
+        title: 'About'
       }
     }
   ]

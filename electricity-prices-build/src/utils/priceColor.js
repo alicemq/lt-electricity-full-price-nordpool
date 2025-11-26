@@ -9,7 +9,7 @@ export function getPriceClass(price, average, settings, isCurrent = false) {
     return result;
   }
   if (priceValue >= parseFloat(settings.expensiveThreshold)) {
-    result.classes = isCurrent ? ['table-danger', 'price-expensive-current'] : 'table-danger';
+    result.classes = isCurrent ? ['table-warning', 'price-expensive-current'] : 'table-warning';
     result.reason = `Price ${priceValue.toFixed(2)} is above expensive threshold ${settings.expensiveThreshold}`;
     return result;
   }
@@ -24,7 +24,7 @@ export function getPriceClass(price, average, settings, isCurrent = false) {
     return result;
   }
   if (priceValue >= expensiveLimit) {
-    result.classes = isCurrent ? ['table-danger', 'price-expensive-current'] : 'table-danger';
+    result.classes = isCurrent ? ['table-warning', 'price-expensive-current'] : 'table-warning';
     result.reason = `Price ${priceValue.toFixed(2)} is ${settings.expensiveRange}% above average ${average.toFixed(2)}`;
     return result;
   }

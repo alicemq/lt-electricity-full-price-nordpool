@@ -1,11 +1,22 @@
 .price-cheap-current {
   border-left: 4px solid var(--bs-success);
+  background-color: var(--bs-success-bg-subtle);
 }
 
 .price-expensive-current {
   border-left: 4px solid var(--bs-danger);
+  background-color: var(--bs-danger-bg-subtle);
 }
 
 .price-current {
   border-left: 4px solid var(--bs-primary);
+  background-color: var(--bs-primary-bg-subtle);
 }
+/* 
+tbody tr.table-success td {
+  background-color: var(--bs-success-bg-subtle) !important;
+}
+
+tbody tr.table-warning td {
+  background-color: var(--bs-danger-bg-subtle) !important;
+} */

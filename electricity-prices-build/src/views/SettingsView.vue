@@ -1,46 +1,88 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import PriceSettings from '../components/PriceSettings.vue';
+import LanguageSwitcher from '../components/LanguageSwitcher.vue';
 </script>
 
 <template>
   <div class="settings-page container">
-    <h1 class="mb-3">Settings</h1>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="mb-0">{{ $t('settings.title') }}</h1>
+      <LanguageSwitcher />
+    </div>
     <PriceSettings />
     <div class="settings card">
       <div class="card-body">
-        <div class="mb-3">
-          <label class="form-label">Cheap Price Threshold (ct/kWh)</label>
-          <input type="number" class="form-control" v-model="settings.cheapThreshold" step="0.1" min="0">
+        <h2 class="h5 mb-3">{{ $t('settings.colorTitle') }}</h2>
+        <div class="row justify-content-center">
+          <div class="col">
+            <label for="cheapThreshold" class="form-label">{{ $t('settings.cheapThreshold') }}</label>
+            <div class="input-group">
+              <input id="cheapThreshold" type="number" class="form-control" v-model="settings.cheapThreshold" step="0.1" min="0">
+              <span class="input-group-text">ct/kWh</span>
+            </div>
+          </div>
+          <div class="col">
+            <label for="expensiveThreshold" class="form-label">{{ $t('settings.expensiveThreshold') }}</label>
+            <div class="input-group">
+              <input id="expensiveThreshold" type="number" class="form-control" v-model="settings.expensiveThreshold" step="0.1" min="0">
+              <span class="input-group-text">ct/kWh</span>
+            </div>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label">Expensive Price Threshold (ct/kWh)</label>
-          <input type="number" class="form-control" v-model="settings.expensiveThreshold" step="0.1" min="0">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Price Ranges from Average (%)</label>
-          <div class="sliders-container">
-            <div class="mb-3">
-              <label class="form-label text-muted">Cheap below</label>
-              <div class="range-container">
-                <input type="range" class="form-range" v-model.number="settings.cheapRange" min="0" max="100" step="1">
+        <div class="mt-4 mb-0">
+          <label class="form-label mb-2">{{ $t('settings.rangesLabel') }}</label>
+          <div class="row justify-content-center">
+            <div class="col">
+              <label for="cheapRange" class="form-label text-muted">{{ $t('settings.cheapBelow') }}</label>
+              <div class="input-group">
+                <input 
+                  id="cheapRange"
+                  type="number"
+                  class="form-control"
+                  v-model.number="settings.cheapRange"
+                  min="0"
+                  max="100"
+                  step="1"
+                >
+                <span class="input-group-text">%</span>
               </div>
-              <span class="badge bg-primary">{{ settings.cheapRange }}%</span>
             </div>
             
-            <div class="mb-3">
-              <label class="form-label text-muted">Expensive above</label>
-              <div class="range-container">
-                <input type="range" class="form-range" v-model.number="settings.expensiveRange" min="0" max="100" step="1">
+            <div class="col">
+              <label for="expensiveRange" class="form-label text-muted">{{ $t('settings.expensiveAbove') }}</label>
+              <div class="input-group">
+                <input
+                  id="expensiveRange"
+                  type="number"
+                  class="form-control"  
+                  v-model.number="settings.expensiveRange"
+                  min="0"
+                  max="100"
+                  step="1"
+                >
+                <span class="input-group-text">%</span>
               </div>
-              <span class="badge bg-primary">{{ settings.expensiveRange }}%</span>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div class="text-center mt-4">
-      <RouterLink to="/" class="btn btn-primary">Save and Close</RouterLink>
+      <RouterLink to="/" class="btn btn-primary">{{ $t('settings.saveAndClose') }}</RouterLink>
+    </div>
+    <div class="text-center mt-4" id="extra-links">
+      <div class="btn-group" role="group">
+        <RouterLink to="/about" class="btn btn-outline-secondary btn-sm">
+          {{ $t('settings.about') }}
+        </RouterLink>
+        <a href="/api" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+          {{ $t('settings.swaggerDocs') }}
+        </a>
+        <RouterLink to="/status" class="btn btn-outline-secondary btn-sm">
+          {{ $t('settings.systemStatus') }}
+        </RouterLink>
+      </div>
     </div>
   </div>
 </template>

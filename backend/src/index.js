@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import moment from 'moment-timezone';
-import { getPriceData, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getDatabaseStats, getSystemHealth } from './database.js';
+import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getDatabaseStats, getSystemHealth, getInitialSyncStatus } from './database.js';
 import v1Router from './v1.js';
 import { startSyncWorker, stopSyncWorker, getSyncStatus } from './syncWorker.js';
 
@@ -203,6 +203,24 @@ app.get('/api/countries', async (req, res) => {
   }
 });
 
+// Initial sync status (legacy path)
+app.get('/api/sync/initial-status', async (req, res) => {
+  try {
+    const status = await getInitialSyncStatus();
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    console.error('Error getting initial sync status (legacy path):', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get initial sync status',
+      details: error.message
+    });
+  }
+});
+
 // Get latest price for a specific country (similar to Elering API)
 app.get('/api/nps/price/:country/latest', async (req, res) => {
   try {
@@ -373,8 +391,9 @@ app.get('/api/nps/price/:country/current', async (req, res) => {
 // Get price data for a specific date or date range (moved to /api/nps/prices)
 app.get('/api/nps/prices', async (req, res) => {
   try {
-    let { date, start, end, country = 'lt' } = req.query;
-    country = country.toLowerCase();
+    let { date, start, end, country } = req.query;
+    const requestedAll = !country;
+    country = (country || '').toLowerCase();
     
     let startDate, endDate;
 
@@ -408,9 +427,14 @@ app.get('/api/nps/prices', async (req, res) => {
       });
     }
 
-    const priceData = await getPriceData(startDate, endDate, country);
+    let rawData;
+    if (requestedAll) {
+      rawData = await getPriceDataAll(startDate, endDate);
+    } else {
+      rawData = await getPriceData(startDate, endDate, country);
+    }
     
-    if (priceData.length === 0) {
+    if (rawData.length === 0) {
       return res.status(404).json({ 
         success: false,
         error: 'No price data found for the specified date range',
@@ -418,22 +442,39 @@ app.get('/api/nps/prices', async (req, res) => {
       });
     }
     
-    // Transform data to match frontend expectations and convert to local timezone
-    const transformedData = priceData.map(item => ({
+    const grouped = requestedAll
+      ? rawData.reduce((acc, item) => {
+          const key = item.country.toLowerCase();
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(item);
+          return acc;
+        }, {})
+      : { [country]: rawData };
+
+    const data = {};
+    Object.entries(grouped).forEach(([code, items]) => {
+      data[code] = items.map(item => ({
       timestamp: moment.unix(item.timestamp).tz("Europe/Vilnius").unix(),
       price: parseFloat(item.price)
     }));
+    });
+
+    let intervalSeconds = null;
+    const anyItems = Object.values(grouped).find(arr => arr.length >= 2);
+    if (anyItems) {
+      const diff = anyItems[1].timestamp - anyItems[0].timestamp;
+      if (diff > 0) intervalSeconds = diff;
+    }
 
     res.json({
       success: true,
-      data: {
-        [country]: transformedData
-      },
+      data,
       meta: {
         date: date || `${start} to ${end}`,
-        country,
-        count: transformedData.length,
-        timezone: 'Europe/Vilnius'
+        country: requestedAll ? 'all' : country,
+        count: rawData.length,
+        timezone: 'Europe/Vilnius',
+        intervalSeconds
       }
     });
   } catch (error) {
@@ -520,19 +561,35 @@ app.put('/api/settings/:key', async (req, res) => {
   }
 });
 
-// Get price configurations
+// Get all price configurations (for frontend to cache)
+// Optional country parameter: if provided, returns only that country's tariffs
+// If omitted, returns all countries
 app.get('/api/configurations', async (req, res) => {
   try {
-    const { date, zone, plan } = req.query;
+    const database = await import('./database.js');
+    const { getAllPriceConfigurations, getAllSystemCharges } = database;
+    const { country } = req.query;
     
-    // This would query the price_configurations table
-    // For now, return a placeholder response
+    const tariffs = await getAllPriceConfigurations(country || null);
+    const systemCharges = await getAllSystemCharges(country || null);
+    
     res.json({
-      message: 'Price configurations endpoint - to be implemented'
+      success: true,
+      data: {
+        tariffs,
+        systemCharges
+      },
+      meta: {
+        country: country || 'all',
+        count: Object.keys(tariffs).length
+      }
     });
   } catch (error) {
     console.error('Error fetching configurations:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
   }
 });
 
@@ -549,6 +606,16 @@ app.use((req, res) => {
 
 // Start server
 const server = app.listen(PORT, async () => {
+  const startupTime = new Date().toISOString();
+  console.log('='.repeat(80));
+  console.log(`[CONTAINER WAKE-UP DETECTED] Backend API server starting...`);
+  console.log(`[CONTAINER WAKE-UP] Startup timestamp: ${startupTime}`);
+  console.log(`[CONTAINER WAKE-UP] Process ID: ${process.pid}`);
+  console.log(`[CONTAINER WAKE-UP] Node version: ${process.version}`);
+  console.log(`[CONTAINER WAKE-UP] Platform: ${process.platform}`);
+  console.log(`[CONTAINER WAKE-UP] Note: This log appears on container START (not pause/resume)`);
+  console.log('='.repeat(80));
+  
   console.log(`Backend API server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`API base: http://localhost:${PORT}/api`);
@@ -559,11 +626,11 @@ const server = app.listen(PORT, async () => {
   
   // Start the sync worker after server is ready
   try {
-    console.log('Starting sync worker...');
+    console.log('[CONTAINER WAKE-UP] Starting sync worker...');
     await startSyncWorker();
-    console.log('Sync worker started successfully');
+    console.log('[CONTAINER WAKE-UP] Sync worker started successfully');
   } catch (error) {
-    console.error('Failed to start sync worker:', error);
+    console.error('[CONTAINER WAKE-UP] Failed to start sync worker:', error);
     // Don't exit - the API server can still function without sync
   }
 });

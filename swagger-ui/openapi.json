@@ -3,27 +3,42 @@
   "info": {
     "title": "Electricity Prices NordPool API",
     "version": "1.0.0",
-    "description": "API for electricity price data from NordPool via Elering API",
+    "description": "# Electricity Prices NordPool API\n\nComprehensive API for accessing electricity price data from NordPool via Elering API.\n\n## Features\n- **Multi-country support**: Lithuania (LT), Estonia (EE), Latvia (LV), Finland (FI)\n- **DST-aware timestamps**: Proper handling of daylight saving time transitions\n- **Historical data**: Access to price data from 2012-07-01 to present\n- **Real-time updates**: Latest clearing prices from NordPool\n- **Secure architecture**: All requests routed through frontend proxy\n\n## Architecture\n- **Production**: All API calls go through frontend proxy at `/api/v1/*`\n- **Development**: Direct backend access available for debugging\n- **Security**: Backend services not exposed to internet\n\n## Data Sources\n- **Primary**: Elering API (https://dashboard.elering.ee/api/nps/price)\n- **Storage**: PostgreSQL database with optimized queries\n- **Sync**: Automated every 30 minutes during NordPool hours\n\n## Timezone Handling\n- **Market timezone**: Europe/Vilnius (CET/CEST)\n- **NordPool boundaries**: 22:00 UTC to 21:59 UTC\n- **DST conversion**: Automatic handling of daylight saving time\n\n## Rate Limits\n- **No current limits**: API designed for public access\n- **Caching**: Database-based caching for optimal performance\n- **Monitoring**: All requests logged for analytics\n",
     "contact": {
-      "name": "Electricity Prices Team"
+      "name": "Electricity Prices Team",
+      "url": "https://github.com/your-repo/electricity-prices"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "externalDocs": {
+      "description": "Project Documentation",
+      "url": "https://github.com/your-repo/electricity-prices/blob/main/README.md"
     }
   },
   "servers": [
     {
-      "url": "http://localhost/api/v1",
-      "description": "Development API Server (v1 via frontend proxy)"
+      "url": "http://localhost:3000/api/v1",
+      "description": "Development API Server"
+    },
+    {
+      "url": "http://backend:3000/api/v1",
+      "description": "Docker Internal API Server"
     },
     {
       "url": "/api/v1",
-      "description": "Production API Server (v1 via proxy)"
+      "description": "Production API Server (via proxy)"
     }
   ],
   "paths": {
     "/health": {
       "get": {
         "summary": "Comprehensive health check",
-        "description": "Returns system health, database statistics, sync status, scheduled jobs, and chunked sync progress. Useful for monitoring and diagnostics.",
-        "tags": ["Health"],
+        "description": "Returns system health, database statistics, sync status, scheduled jobs, and chunked sync progress. Useful for monitoring and diagnostics.\n",
+        "tags": [
+          "Health"
+        ],
         "responses": {
           "200": {
             "description": "System health and status",
@@ -45,7 +60,7 @@
                     "system": {
                       "type": "object"
                     },
-                        "database": {
+                    "database": {
                       "type": "object"
                     },
                     "sync": {
@@ -62,7 +77,7 @@
                       "items": {
                         "type": "object"
                       }
-                        },
+                    },
                     "issues": {
                       "type": "array",
                       "items": {
@@ -79,7 +94,7 @@
                     "nodeVersion": "v20.19.3",
                     "platform": "linux",
                     "uptime": "12 hours"
-                        },
+                  },
                   "database": {
                     "connected": true,
                     "uptime": "1 day",
@@ -101,7 +116,7 @@
                     {
                       "name": "All Countries NordPool Sync",
                       "schedule": "30,0 12-17 * * *"
-                        }
+                    }
                   ],
                   "dataFreshness": [
                     {
@@ -110,8 +125,8 @@
                     }
                   ],
                   "issues": []
-                    }
-                  }
+                }
+              }
             }
           },
           "500": {
@@ -131,7 +146,9 @@
       "get": {
         "summary": "Get available countries",
         "description": "Retrieve list of available countries for price data",
-        "tags": ["Countries"],
+        "tags": [
+          "Countries"
+        ],
         "responses": {
           "200": {
             "description": "List of available countries",
@@ -182,7 +199,9 @@
       "get": {
         "summary": "Get latest price for a country",
         "description": "Get the most recent electricity price for a specific country",
-        "tags": ["Prices"],
+        "tags": [
+          "Prices"
+        ],
         "parameters": [
           {
             "name": "country",
@@ -190,7 +209,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["lt", "ee", "lv", "fi", "all"]
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi",
+                "all"
+              ]
             },
             "description": "Country code (case insensitive) or \"all\" for all countries"
           }
@@ -223,7 +248,9 @@
                     }
                   ],
                   "meta": {
-                    "countries": ["LT"],
+                    "countries": [
+                      "LT"
+                    ],
                     "date": "2025-06-26",
                     "hour": "00:00",
                     "timezone": "Europe/Vilnius",
@@ -250,9 +277,11 @@
     },
     "/nps/price/{country}/current": {
       "get": {
-        "summary": "Get current hour price for a country",
-        "description": "Get electricity price for the current hour in Europe/Vilnius timezone",
-        "tags": ["Prices"],
+        "summary": "Get current interval price for a country",
+        "description": "Get electricity price for the current market time unit (MTU) in Europe/Vilnius timezone.\n\nThe API returns the latest available slot up to \"now\", regardless of whether the underlying data is in legacy 60-minute resolution or new 15-minute MTU.\n",
+        "tags": [
+          "Prices"
+        ],
         "parameters": [
           {
             "name": "country",
@@ -260,14 +289,20 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["lt", "ee", "lv", "fi", "all"]
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi",
+                "all"
+              ]
             },
             "description": "Country code (case insensitive) or \"all\" for all countries"
           }
         ],
         "responses": {
           "200": {
-            "description": "Current hour price data",
+            "description": "Current interval price data",
             "content": {
               "application/json": {
                 "schema": {
@@ -309,13 +344,15 @@
                     }
                   ],
                   "meta": {
-                    "countries": ["LT"],
+                    "countries": [
+                      "LT"
+                    ],
                     "date": "2025-06-26",
                     "hour": "00:00",
                     "timezone": "Europe/Vilnius",
                     "timestamp_local": 1750885200,
                     "price_unit": "EUR/MWh",
-                    "data_type": "current_hour",
+                    "data_type": "current_interval",
                     "current_time_local": "2025-06-26 00:15:30",
                     "is_current_hour": true
                   }
@@ -339,8 +376,10 @@
     "/nps/prices": {
       "get": {
         "summary": "Get price data for date or date range",
-        "description": "Get electricity prices for a specific date or date range",
-        "tags": ["Prices"],
+        "description": "Retrieve electricity prices for a specific date or date range.\n\n**Features:**\n- Single date or date range queries\n- Multi-country support (LT, EE, LV, FI)\n- DST-aware timestamp handling\n- Optimized database queries\n\n**Usage Examples:**\n- Single day: `?date=2025-06-26&country=lt`\n- Date range: `?start=2025-06-01&end=2025-06-30&country=ee`\n- All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)\n\n**Response Format:**\n- One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)\n- Prices in EUR/MWh\n- Unix timestamps (seconds) for easy processing\n",
+        "tags": [
+          "Prices"
+        ],
         "parameters": [
           {
             "name": "date",
@@ -348,9 +387,9 @@
             "schema": {
               "type": "string",
               "format": "date",
-              "example": "2025-06-01"
+              "example": "2025-06-26"
             },
-            "description": "Single date (YYYY-MM-DD)"
+            "description": "Single date in YYYY-MM-DD format (mutually exclusive with start/end)"
           },
           {
             "name": "start",
@@ -360,7 +399,7 @@
               "format": "date",
               "example": "2025-06-01"
             },
-            "description": "Start date for range (YYYY-MM-DD)"
+            "description": "Start date for range in YYYY-MM-DD format (requires end parameter)"
           },
           {
             "name": "end",
@@ -368,19 +407,23 @@
             "schema": {
               "type": "string",
               "format": "date",
-              "example": "2025-06-10",
-              "pattern": "YYYY-MM-DD"
+              "example": "2025-06-30"
             },
-            "description": "End date for range (YYYY-MM-DD)"
+            "description": "End date for range in YYYY-MM-DD format (requires start parameter)"
           },
           {
             "name": "country",
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["lt", "ee", "lv", "fi"]
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi"
+              ]
             },
-            "description": "Country code (default: lt)"
+            "description": "Country code (case insensitive). If omitted, returns data for all countries."
           }
         ],
         "responses": {
@@ -392,7 +435,258 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/PriceData"
+                        }
+                      },
+                      "description": "Price data organized by country code"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": "string",
+                          "example": "2025-06-26"
+                        },
+                        "country": {
+                          "type": "string",
+                          "example": "all"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "example": 96
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "example": "Europe/Vilnius"
+                        },
+                        "intervalSeconds": {
+                          "type": "integer",
+                          "description": "Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)",
+                          "example": 900
+                        },
+                        "total_records": {
+                          "type": "integer",
+                          "example": 24
+                        },
+                        "date_range": {
+                          "type": "object",
+                          "properties": {
+                            "start": {
+                              "type": "string",
+                              "example": "2025-06-26"
+                            },
+                            "end": {
+                              "type": "string",
+                              "example": "2025-06-26"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "single_day": {
+                    "summary": "Single day prices for Lithuania",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lt": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 75.0
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 68.5
+                          },
+                          {
+                            "timestamp": 1750892400,
+                            "price": 72.1
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "date": "2025-06-26",
+                        "country": "lt",
+                        "count": 24,
+                        "timezone": "Europe/Vilnius",
+                        "intervalSeconds": 3600,
+                        "date_range": {
+                          "start": "2025-06-26",
+                          "end": "2025-06-26"
+                        }
+                      }
+                    }
+                  },
+                  "all_countries": {
+                    "summary": "Single day prices for all countries",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lt": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 75.0
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 68.5
+                          }
+                        ],
+                        "ee": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 78.2
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 71.3
+                          }
+                        ],
+                        "lv": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 76.5
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 69.8
+                          }
+                        ],
+                        "fi": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 72.1
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 65.4
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "date": "2025-06-26",
+                        "country": "all",
+                        "count": 96,
+                        "timezone": "Europe/Vilnius",
+                        "intervalSeconds": 3600,
+                        "date_range": {
+                          "start": "2025-06-26",
+                          "end": "2025-06-26"
+                        }
+                      }
+                    }
+                  },
+                  "date_range": {
+                    "summary": "Date range prices for Estonia",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "ee": [
+                          {
+                            "timestamp": 1750885200,
+                            "price": 78.2
+                          },
+                          {
+                            "timestamp": 1750888800,
+                            "price": 71.3
+                          }
+                        ]
+                      },
+                      "meta": {
+                        "date": "2025-06-01 to 2025-06-30",
+                        "country": "ee",
+                        "count": 720,
+                        "timezone": "Europe/Vilnius",
+                        "intervalSeconds": 3600,
+                        "date_range": {
+                          "start": "2025-06-01",
+                          "end": "2025-06-30"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters (missing required parameters or invalid date format)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Invalid date format. Use YYYY-MM-DD format.",
+                  "code": "INVALID_DATE_FORMAT"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No price data found for the specified parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "success": false,
+                  "error": "No price data found for the specified date range",
+                  "code": "NO_DATA_FOUND"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nps/prices/upcoming": {
+      "get": {
+        "summary": "Get upcoming prices from current interval",
+        "description": "Retrieve upcoming electricity prices from the current market time unit (MTU) onward.\n\nThis endpoint returns all future slots from \"now\" until the end of today and tomorrow (Europe/Vilnius timezone),\nusing one record per MTU (hourly or 15-minute).\n",
+        "tags": [
+          "Prices"
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi"
+              ],
+              "default": "lt"
+            },
+            "description": "Country code (defaults to Lithuania if not specified)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upcoming price data from current MTU to end of tomorrow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
                     },
                     "data": {
                       "type": "object",
@@ -406,17 +700,38 @@
                     "meta": {
                       "type": "object",
                       "properties": {
-                        "date": {
-                          "type": "string"
-                        },
                         "country": {
-                          "type": "string"
+                          "type": "string",
+                          "example": "lt"
                         },
                         "count": {
-                          "type": "integer"
+                          "type": "integer",
+                          "example": 48
                         },
                         "timezone": {
-                          "type": "string"
+                          "type": "string",
+                          "example": "Europe/Vilnius"
+                        },
+                        "intervalSeconds": {
+                          "type": "integer",
+                          "example": 900
+                        },
+                        "current_time_local": {
+                          "type": "string",
+                          "example": "2025-06-26 12:07:00"
+                        },
+                        "date_range": {
+                          "type": "object",
+                          "properties": {
+                            "start": {
+                              "type": "string",
+                              "example": "2025-06-26"
+                            },
+                            "end": {
+                              "type": "string",
+                              "example": "2025-06-27"
+                            }
+                          }
                         }
                       }
                     }
@@ -427,41 +742,41 @@
                   "data": {
                     "lt": [
                       {
-                        "timestamp": 1750885200,
+                        "timestamp": 1750932000,
                         "price": 75.0
                       },
                       {
-                        "timestamp": 1750888800,
+                        "timestamp": 1750932900,
                         "price": 68.5
                       }
                     ]
                   },
                   "meta": {
-                    "date": "2025-06-26",
                     "country": "lt",
                     "count": 2,
-                    "timezone": "Europe/Vilnius"
+                    "timezone": "Europe/Vilnius",
+                    "intervalSeconds": 900,
+                    "current_time_local": "2025-06-26 12:07:00",
+                    "date_range": {
+                      "start": "2025-06-26",
+                      "end": "2025-06-27"
+                    }
                   }
                 }
               }
             }
           },
-          "400": {
-            "description": "Invalid parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "404": {
-            "description": "No price data found",
+            "description": "No upcoming price data available",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "success": false,
+                  "error": "No upcoming price data available",
+                  "code": "NO_DATA_FOUND"
                 }
               }
             }
@@ -473,14 +788,21 @@
       "get": {
         "summary": "Get latest price (legacy endpoint)",
         "description": "Legacy endpoint for backward compatibility",
-        "tags": ["Prices"],
+        "tags": [
+          "Prices"
+        ],
         "parameters": [
           {
             "name": "country",
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["lt", "ee", "lv", "fi"]
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi"
+              ]
             },
             "description": "Country code (default: lt)"
           }
@@ -569,8 +891,10 @@
     "/sync/reset-initial": {
       "post": {
         "summary": "Reset initial sync status",
-        "description": "Clears the initial sync completion and last chunk markers in the database. Use this endpoint to force the backend to re-run the initial sync on next startup. Intended for testing and maintenance.",
-        "tags": ["Sync"],
+        "description": "Clears the initial sync completion and last chunk markers in the database. Use this endpoint to force the backend to re-run the initial sync on next startup. Intended for testing and maintenance.\n",
+        "tags": [
+          "Sync"
+        ],
         "responses": {
           "200": {
             "description": "Initial sync status reset successfully",
@@ -610,8 +934,10 @@
     "/sync/initial-status": {
       "get": {
         "summary": "Get initial sync status",
-        "description": "Returns the current status of the initial sync process, including whether it is complete, the last completed date, record count, and any errors. The initial sync is performed in chunks, and only marked complete when the final chunk (up to today) is finished.",
-        "tags": ["Sync"],
+        "description": "Returns the current status of the initial sync process, including whether it is complete, the last completed date, record count, and any errors. The initial sync is performed in chunks, and only marked complete when the final chunk (up to today) is finished.\n",
+        "tags": [
+          "Sync"
+        ],
         "responses": {
           "200": {
             "description": "Initial sync status",
@@ -679,88 +1005,480 @@
     "schemas": {
       "Country": {
         "type": "object",
+        "description": "Country information for electricity price data",
         "properties": {
           "code": {
             "type": "string",
-            "example": "lt"
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "lt",
+            "enum": [
+              "lt",
+              "ee",
+              "lv",
+              "fi"
+            ]
           },
           "name": {
             "type": "string",
-            "example": "Lithuania"
+            "description": "Full country name",
+            "example": "Lithuania",
+            "enum": [
+              "Lithuania",
+              "Estonia",
+              "Latvia",
+              "Finland"
+            ]
           }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "example": {
+          "code": "lt",
+          "name": "Lithuania"
         }
       },
       "PriceData": {
         "type": "object",
+        "description": "Individual electricity price data point",
         "properties": {
           "timestamp": {
             "type": "integer",
-            "description": "Unix timestamp",
-            "example": 1750885200
+            "description": "Unix timestamp in seconds (UTC)",
+            "example": 1750885200,
+            "minimum": 0
           },
           "price": {
             "type": "number",
-            "description": "Price in EUR/MWh",
-            "example": 75.0
+            "description": "Electricity price in EUR/MWh",
+            "example": 75.0,
+            "minimum": 0,
+            "format": "float"
           },
           "country": {
             "type": "string",
-            "description": "Country code (optional, included in some responses)",
-            "example": "LT"
+            "description": "Country code (included in some responses)",
+            "example": "LT",
+            "enum": [
+              "LT",
+              "EE",
+              "LV",
+              "FI"
+            ]
           }
+        },
+        "required": [
+          "timestamp",
+          "price"
+        ],
+        "example": {
+          "timestamp": 1750885200,
+          "price": 75.0,
+          "country": "LT"
         }
       },
       "PriceMeta": {
         "type": "object",
+        "description": "Metadata for price data responses",
         "properties": {
           "countries": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "LT",
+                "EE",
+                "LV",
+                "FI"
+              ]
             },
-            "example": ["LT"]
+            "description": "List of countries in the response",
+            "example": [
+              "LT"
+            ]
           },
           "date": {
             "type": "string",
             "format": "date",
+            "description": "Date in YYYY-MM-DD format",
             "example": "2025-06-26"
           },
           "hour": {
             "type": "string",
-            "example": "00:00"
+            "description": "Hour in HH:MM format",
+            "example": "00:00",
+            "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
           },
           "timezone": {
             "type": "string",
-            "example": "Europe/Vilnius"
+            "description": "Timezone used for timestamps",
+            "example": "Europe/Vilnius",
+            "default": "Europe/Vilnius"
           },
           "timestamp_local": {
             "type": "integer",
-            "example": 1750885200
+            "description": "Local timestamp in seconds",
+            "example": 1750885200,
+            "minimum": 0
           },
           "price_unit": {
             "type": "string",
-            "example": "EUR/MWh"
+            "description": "Price unit",
+            "example": "EUR/MWh",
+            "default": "EUR/MWh"
           },
           "data_type": {
             "type": "string",
-            "example": "latest_published"
+            "description": "Type of price data",
+            "example": "latest_published",
+            "enum": [
+              "latest_published",
+              "current_hour",
+              "historical"
+            ]
+          },
+          "current_time_local": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Current local time (for current hour endpoints)",
+            "example": "2025-06-26T00:15:30.024Z"
+          },
+          "is_current_hour": {
+            "type": "boolean",
+            "description": "Whether the data represents the current hour",
+            "example": true
           }
+        },
+        "required": [
+          "countries",
+          "date",
+          "hour",
+          "timezone",
+          "timestamp_local",
+          "price_unit",
+          "data_type"
+        ],
+        "example": {
+          "countries": [
+            "LT"
+          ],
+          "date": "2025-06-26",
+          "hour": "00:00",
+          "timezone": "Europe/Vilnius",
+          "timestamp_local": 1750885200,
+          "price_unit": "EUR/MWh",
+          "data_type": "latest_published",
+          "current_time_local": "2025-06-26T00:15:30.024Z",
+          "is_current_hour": true
         }
       },
       "Error": {
         "type": "object",
+        "description": "Standard error response format",
         "properties": {
           "success": {
             "type": "boolean",
-            "example": false
+            "description": "Always false for error responses",
+            "example": false,
+            "default": false
           },
           "error": {
             "type": "string",
-            "example": "No price data found"
+            "description": "Human-readable error message",
+            "example": "No price data found for the specified country"
           },
           "code": {
             "type": "string",
-            "example": "NO_DATA_FOUND"
+            "description": "Machine-readable error code",
+            "example": "NO_DATA_FOUND",
+            "enum": [
+              "NO_DATA_FOUND",
+              "INVALID_DATE_FORMAT",
+              "INVALID_COUNTRY",
+              "INVALID_PARAMETERS",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Error timestamp",
+            "example": "2025-06-26T00:15:30.024Z"
+          },
+          "path": {
+            "type": "string",
+            "description": "Request path that caused the error",
+            "example": "/api/v1/nps/price/lt/latest"
+          }
+        },
+        "required": [
+          "success",
+          "error",
+          "code"
+        ],
+        "example": {
+          "success": false,
+          "error": "No price data found for the specified country",
+          "code": "NO_DATA_FOUND",
+          "timestamp": "2025-06-26T00:15:30.024Z",
+          "path": "/api/v1/nps/price/lt/latest"
+        }
+      }
+    },
+    "/configurations": {
+      "get": {
+        "summary": "Get price configurations and system charges",
+        "description": "Retrieve electricity tariff configurations and system charges for price calculations.\n\n**Features:**\n- Multi-country support (LT, EE, LV, FI)\n- Historical tariff data grouped by effective date\n- System charges (VIAP, distributionplus, etc.)\n- Optimized for frontend caching\n\n**Usage Examples:**\n- Single country: `?country=lt`\n- All countries: (omit country parameter)\n\n**Response Format:**\n- Tariffs grouped by country, then by effective date, then by zone and plan\n- System charges grouped by country, then by effective date\n- Data structure optimized for date-based lookups\n",
+        "tags": [
+          "Configuration"
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi"
+              ]
+            },
+            "description": "Country code (case insensitive). If omitted, returns data for all countries."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price configurations and system charges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tariffs": {
+                          "type": "object",
+                          "description": "Tariffs grouped by country, then effective date, then zone and plan",
+                          "additionalProperties": {
+                            "type": "object",
+                            "description": "Country code (lt, ee, lv, fi)",
+                            "additionalProperties": {
+                              "type": "object",
+                              "description": "Effective date (YYYY-MM-DD)",
+                              "additionalProperties": {
+                                "type": "object",
+                                "description": "Zone name (Four zones, Two zones, Single zone)",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "description": "Plan name (Standart, Smart, Effective, Home, etc.)",
+                                  "additionalProperties": {
+                                    "type": "number",
+                                    "description": "Price for time period (morning, day, evening, night)"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "type": "object",
+                          "description": "System charges grouped by country, then effective date",
+                          "additionalProperties": {
+                            "type": "object",
+                            "description": "Country code (lt, ee, lv, fi)",
+                            "additionalProperties": {
+                              "type": "object",
+                              "description": "Effective date (YYYY-MM-DD)",
+                              "additionalProperties": {
+                                "type": "number",
+                                "description": "Charge amount (VIAP, distributionplus, etc.)"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "country": {
+                          "type": "string",
+                          "description": "Requested country or \"all\"",
+                          "example": "lt"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "Number of countries in response",
+                          "example": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "single_country": {
+                    "summary": "Price configurations for Lithuania",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "tariffs": {
+                          "lt": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              },
+                              "Two zones": {
+                                "Standart": {
+                                  "day": 0.0968,
+                                  "night": 0.05687
+                                }
+                              }
+                            },
+                            "2024-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.07502,
+                                  "day": 0.09438,
+                                  "evening": 0.12826,
+                                  "night": 0.05929
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "lt": {
+                            "2024-01-01": {
+                              "VIAP": 0.0,
+                              "distributionplus": 0.00045
+                            },
+                            "2025-01-01": {
+                              "VIAP": -0.00039,
+                              "distributionplus": 0.000893
+                            }
+                          }
+                        }
+                      },
+                      "meta": {
+                        "country": "lt",
+                        "count": 1
+                      }
+                    }
+                  },
+                  "all_countries": {
+                    "summary": "Price configurations for all countries",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "tariffs": {
+                          "lt": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "ee": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "lv": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "fi": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "lt": {
+                            "2024-01-01": {
+                              "VIAP": 0.0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "ee": {
+                            "2024-01-01": {
+                              "VIAP": 0.0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "lv": {
+                            "2024-01-01": {
+                              "VIAP": 0.0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "fi": {
+                            "2024-01-01": {
+                              "VIAP": 0.0,
+                              "distributionplus": 0.00045
+                            }
+                          }
+                        }
+                      },
+                      "meta": {
+                        "country": "all",
+                        "count": 4
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch configurations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -780,8 +1498,8 @@
       "description": "Country information endpoints"
     },
     {
-      "name": "Sync",
-      "description": "Data synchronization and management endpoints"
+      "name": "Configuration",
+      "description": "Price configuration and tariff endpoints"
     }
   ]
 }

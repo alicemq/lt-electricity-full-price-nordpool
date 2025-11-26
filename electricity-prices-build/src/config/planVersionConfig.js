@@ -13,6 +13,11 @@ export const planVersions = {
     "Four zones": ["Standart", "Effective"],
     "Two zones": ["Standart", "Home", "Effective"],
     "Single zone": ["Standart", "Home", "Effective"]
+  },
+  "2026-01-01": {
+    "Four zones": ["Standart", "Effective"],
+    "Two zones": ["Standart", "Home", "Effective"],
+    "Single zone": ["Standart", "Home", "Effective"]
   }
 };
 

@@ -30,10 +30,18 @@ const saveSettings = () => {
 };
 
 const upcomingPrices = computed(() => {
-  const currentTime = new Date();
+  const nowSec = Math.floor(Date.now() / 1000);
   return props.priceData
-    .filter(price => new Date(price.timestamp) >= currentTime)
+    .filter(price => price.timestamp >= nowSec)
     .slice(0, settings.value.numberOfHours);
+});
+
+const intervalSeconds = computed(() => {
+  if (props.priceData && props.priceData.length >= 2) {
+    const diff = props.priceData[1].timestamp - props.priceData[0].timestamp;
+    return diff > 0 ? diff : 3600;
+  }
+  return 3600;
 });
 
 // Add debugging to see what data is coming in
@@ -112,12 +120,12 @@ const themeClass = computed(() => {
           >
             <div 
               :style="{
-                fontSize: `${isCurrentHour(price.timestamp) ? settings.currentHourSize : settings.otherHourSize}px`
+                fontSize: `${isCurrentHour(price.timestamp, intervalSeconds) ? settings.currentHourSize : settings.otherHourSize}px`
               }"
             >
               {{ calculatePrice(price) }} ct/kWh
               <small class="text-muted d-block">
-                ({{ formatPriceHours(price.timestamp, 1) }})
+                ({{ formatPriceHours(price.timestamp, intervalSeconds) }})
               </small>
             </div>
           </div>

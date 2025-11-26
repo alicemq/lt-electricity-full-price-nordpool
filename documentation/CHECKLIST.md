@@ -52,9 +52,7 @@
 - [x] **API Documentation**
     - [x] Complete OpenAPI 3.0.3 specification
     - [x] Interactive Swagger UI
-    - [x] Auto-generated client SDKs
     - [x] Rich documentation with examples
-    - [x] Multi-language SDK generation
 
 ### **Performance & Monitoring**
 
@@ -63,6 +61,7 @@
     - [x] Efficient data sync (672 records in 478ms)
     - [x] Proxy overhead minimization (< 5ms)
     - [x] Response time optimization (< 100ms)
+    - [x] MTU-aware pricing (supports both 60-minute and 15-minute Market Time Units with one record per MTU)
 - [x] **Monitoring & Logging**
     - [x] Container health monitoring
     - [x] API request/response logging
@@ -413,11 +412,6 @@
     - [ ] Anomaly detection
     - [ ] Pattern recognition
     - [ ] Automated insights
-
-### **SDK Generation**
-
-- [ ] **Rust SDK** - Native Rust client
-- [ ] **Swift SDK** - iOS/macOS client
 
 ## 🎯 **SUCCESS METRICS**
 

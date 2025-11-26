@@ -27,7 +27,7 @@ export async function testConnection() {
   }
 }
 
-// Get price data for a specific date range
+// Get price data for a specific date range and country
 export async function getPriceData(startDate, endDate, country = 'lt') {
   try {
     // Validate and convert UTC date strings to timestamps for database querying
@@ -51,6 +51,32 @@ export async function getPriceData(startDate, endDate, country = 'lt') {
     return result.rows;
   } catch (err) {
     console.error('Error getting price data:', err);
+    return [];
+  }
+}
+
+// Get price data for a specific date range for all countries
+export async function getPriceDataAll(startDate, endDate) {
+  try {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      console.error('Invalid date format (all countries):', { startDate, endDate });
+      return [];
+    }
+    
+    const startTimestamp = Math.floor(startDateObj.getTime() / 1000);
+    const endTimestamp = Math.floor(endDateObj.getTime() / 1000);
+    
+    const result = await pool.query(
+      'SELECT timestamp, price, country FROM price_data WHERE timestamp BETWEEN $1 AND $2 ORDER BY country, timestamp',
+      [startTimestamp, endTimestamp]
+    );
+    
+    return result.rows;
+  } catch (err) {
+    console.error('Error getting price data for all countries:', err);
     return [];
   }
 }
@@ -85,22 +111,21 @@ export async function getCurrentPrice(country = 'lt') {
   }
 }
 
-// Get current price (for the current hour in Europe/Vilnius) for a specific country
+// Get current price (latest available slot up to "now") for a specific country
 export async function getCurrentHourPrice(country = 'lt') {
   try {
-    // Get the current time in Europe/Vilnius and round to the start of the current hour
-    const nowVilnius = moment().tz('Europe/Vilnius');
-    const currentHourStart = nowVilnius.clone().startOf('hour');
-    
-    // Convert to UTC timestamp for database query
-    const currentHourTimestamp = currentHourStart.unix();
-    
-    console.log(`Current hour query: ${currentHourStart.format('YYYY-MM-DD HH:mm:ss')} (${currentHourTimestamp})`);
-    
-    // Query for the price at this hour
+    // Use latest price at or before "now" so it works for both hourly and 15-minute granularity
+    const now = Math.floor(Date.now() / 1000);
     const result = await pool.query(
-      'SELECT timestamp, price, country FROM price_data WHERE country = $1 AND timestamp = $2 LIMIT 1',
-      [country, currentHourTimestamp]
+      `
+        SELECT timestamp, price, country
+        FROM price_data
+        WHERE country = $1
+          AND timestamp <= $2
+        ORDER BY timestamp DESC
+        LIMIT 1
+      `,
+      [country, now]
     );
     
     return result.rows[0] || null;
@@ -153,7 +178,7 @@ export async function updateSetting(key, value) {
 }
 
 // Get price configurations for a specific date
-export async function getPriceConfigurations(date, zone, plan) {
+export async function getPriceConfigurations(date, zone, plan, country = 'lt') {
   try {
     const result = await pool.query(
       `SELECT time_period, price 
@@ -161,9 +186,10 @@ export async function getPriceConfigurations(date, zone, plan) {
        WHERE effective_date <= $1 
        AND zone_name = $2 
        AND plan_name = $3
+       AND country = $4
        ORDER BY effective_date DESC
        LIMIT 1`,
-      [date, zone, plan]
+      [date, zone, plan, country]
     );
     
     return result.rows;
@@ -174,14 +200,15 @@ export async function getPriceConfigurations(date, zone, plan) {
 }
 
 // Get system charges for a specific date
-export async function getSystemCharges(date) {
+export async function getSystemCharges(date, country = 'lt') {
   try {
     const result = await pool.query(
       `SELECT charge_type, amount 
        FROM system_charges 
        WHERE effective_date <= $1
+       AND country = $2
        ORDER BY effective_date DESC`,
-      [date]
+      [date, country]
     );
     
     const charges = {};
@@ -192,6 +219,94 @@ export async function getSystemCharges(date) {
     return charges;
   } catch (err) {
     console.error('Error getting system charges:', err);
+    return {};
+  }
+}
+
+// Get all price configurations grouped by effective date and country
+export async function getAllPriceConfigurations(country = null) {
+  try {
+    let query = `SELECT effective_date, country, zone_name, plan_name, time_period, price
+       FROM price_configurations`;
+    const params = [];
+    
+    if (country) {
+      query += ` WHERE country = $1`;
+      params.push(country);
+    }
+    
+    query += ` ORDER BY country, effective_date, zone_name, plan_name, time_period`;
+    
+    const result = await pool.query(query, params);
+    
+    // Group by country, then effective_date, then zone, then plan
+    const grouped = {};
+    result.rows.forEach(row => {
+      const countryKey = row.country || 'lt';
+      // Format date as YYYY-MM-DD string
+      const dateKey = row.effective_date instanceof Date 
+        ? row.effective_date.toISOString().split('T')[0]
+        : row.effective_date.split('T')[0];
+      
+      if (!grouped[countryKey]) {
+        grouped[countryKey] = {};
+      }
+      if (!grouped[countryKey][dateKey]) {
+        grouped[countryKey][dateKey] = {};
+      }
+      if (!grouped[countryKey][dateKey][row.zone_name]) {
+        grouped[countryKey][dateKey][row.zone_name] = {};
+      }
+      if (!grouped[countryKey][dateKey][row.zone_name][row.plan_name]) {
+        grouped[countryKey][dateKey][row.zone_name][row.plan_name] = {};
+      }
+      grouped[countryKey][dateKey][row.zone_name][row.plan_name][row.time_period] = parseFloat(row.price);
+    });
+    
+    return grouped;
+  } catch (err) {
+    console.error('Error getting all price configurations:', err);
+    return {};
+  }
+}
+
+// Get all system charges grouped by effective date and country
+export async function getAllSystemCharges(country = null) {
+  try {
+    let query = `SELECT effective_date, country, charge_type, amount
+       FROM system_charges`;
+    const params = [];
+    
+    if (country) {
+      query += ` WHERE country = $1`;
+      params.push(country);
+    }
+    
+    query += ` ORDER BY country, effective_date, charge_type`;
+    
+    const result = await pool.query(query, params);
+    
+    // Group by country, then effective_date
+    const grouped = {};
+    result.rows.forEach(row => {
+      const countryKey = row.country || 'lt';
+      // Format date as YYYY-MM-DD string
+      const dateKey = row.effective_date instanceof Date 
+        ? row.effective_date.toISOString().split('T')[0]
+        : row.effective_date.split('T')[0];
+      
+      if (!grouped[countryKey]) {
+        grouped[countryKey] = {};
+      }
+      if (!grouped[countryKey][dateKey]) {
+        grouped[countryKey][dateKey] = {};
+      }
+      grouped[countryKey][dateKey][row.charge_type] = parseFloat(row.amount);
+    });
+    
+    return grouped;
+  } catch (err) {
+    console.error('Error getting all system charges:', err);
     return {};
   }
 }
@@ -210,21 +325,18 @@ export async function getLatestPriceAll() {
   }
 }
 
-// Get current hour price for all countries
+// Get current price (latest available slot up to "now") for all countries
 export async function getCurrentHourPriceAll() {
   try {
-    // Get the current time in Europe/Vilnius and round to the start of the current hour
-    const nowVilnius = moment().tz('Europe/Vilnius');
-    const currentHourStart = nowVilnius.clone().startOf('hour');
-    
-    // Convert to UTC timestamp for database query
-    const currentHourTimestamp = currentHourStart.unix();
-    
-    console.log(`Current hour query for all countries: ${currentHourStart.format('YYYY-MM-DD HH:mm:ss')} (${currentHourTimestamp})`);
-    
+    const now = Math.floor(Date.now() / 1000);
     const result = await pool.query(
-      'SELECT timestamp, price, country FROM price_data WHERE timestamp = $1 ORDER BY country',
-      [currentHourTimestamp]
+      `
+        SELECT DISTINCT ON (country) timestamp, price, country
+        FROM price_data
+        WHERE timestamp <= $1
+        ORDER BY country, timestamp DESC
+      `,
+      [now]
     );
     
     return result.rows;
@@ -294,6 +406,27 @@ export async function logSync(syncType, status, recordsProcessed = 0, recordsCre
     ]);
   } catch (err) {
     console.error('Error logging sync:', err);
+  }
+}
+
+// Log scheduled job execution (wrapper for logSync with job-specific types)
+export async function logScheduledJob(jobName, status, details = null, durationMs = null) {
+  try {
+    // Map job names to sync_type values
+    const syncTypeMap = {
+      'Daily Sync': 'daily_sync_check',
+      'Weekly Sync': 'weekly_sync',
+      'Next Day Sync': 'nextday_sync',
+      'Watchdog': 'watchdog_check',
+      'Fallback Cron': 'fallback_cron'
+    };
+    
+    const syncType = syncTypeMap[jobName] || `scheduled_job_${jobName.toLowerCase().replace(/\s+/g, '_')}`;
+    const errorMessage = details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null;
+    
+    await logSync(syncType, status, 0, 0, 0, errorMessage, durationMs);
+  } catch (err) {
+    console.error(`Error logging scheduled job ${jobName}:`, err);
   }
 }
 
@@ -590,6 +723,134 @@ export async function markInitialSyncComplete(endDate, recordsCount) {
     console.log(`Initial sync completion recorded: ${recordsCount} records to ${endDate} at ${completionTime}`);
   } catch (err) {
     console.error('Error recording initial sync completion:', err);
+  }
+}
+
+// Get translations for entities (zones, plans, etc.)
+export async function getTranslations(entityType, entityKeys, locale = 'lt') {
+  try {
+    const result = await pool.query(
+      `SELECT entity_key, translated_label 
+       FROM translations 
+       WHERE entity_type = $1 AND entity_key = ANY($2::varchar[]) AND locale = $3`,
+      [entityType, entityKeys, locale]
+    );
+    
+    // Return as a map for easy lookup
+    const translationMap = {};
+    result.rows.forEach(row => {
+      translationMap[row.entity_key] = row.translated_label;
+    });
+    return translationMap;
+  } catch (err) {
+    console.error('Error fetching translations:', err);
+    return {};
+  }
+}
+
+// Get all zones with translations
+export async function getZonesWithTranslations(locale = 'lt') {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT t.entity_key, t.translated_label
+       FROM translations t
+       WHERE t.entity_type = 'zone' AND t.locale = $1
+       ORDER BY t.entity_key`,
+      [locale]
+    );
+    return result.rows.map(row => ({
+      key: row.entity_key,
+      name: row.translated_label,
+      id: row.entity_key.toLowerCase().replace(/\s+/g, '-')
+    }));
+  } catch (err) {
+    console.error('Error fetching zones with translations:', err);
+    // Fallback to hardcoded if DB fails
+    return [
+      { key: 'Four zones', name: locale === 'lt' ? 'Keturių zonų' : 'Four zones', id: 'four' },
+      { key: 'Two zones', name: locale === 'lt' ? 'Dviejų zonų' : 'Two zones', id: 'two' },
+      { key: 'Single zone', name: locale === 'lt' ? 'Vienos zonos' : 'Single zone', id: 'one' }
+    ];
+  }
+}
+
+// Get available plans for a zone with translations
+export async function getPlansWithTranslations(date, zone, locale = 'lt') {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT pv.plan_name, 
+              COALESCE(t.translated_label, pv.plan_name) as translated_name
+       FROM plan_versions pv
+       LEFT JOIN translations t ON t.entity_type = 'plan' 
+         AND t.entity_key = pv.plan_name 
+         AND t.locale = $3
+       WHERE pv.effective_date <= $1 
+         AND pv.zone_name = $2
+       ORDER BY pv.plan_name`,
+      [date, zone, locale]
+    );
+    return result.rows.map(row => row.translated_name);
+  } catch (err) {
+    console.error('Error fetching plans with translations:', err);
+    return [];
+  }
+}
+
+// Country sync status management
+export async function getCountrySyncStatus(country) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM country_sync_status WHERE country = $1',
+      [country]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    console.error(`Error getting country sync status for ${country}:`, err);
+    return null;
+  }
+}
+
+export async function getAllCountrySyncStatus() {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM country_sync_status ORDER BY country'
+    );
+    return result.rows;
+  } catch (err) {
+    console.error('Error getting all country sync status:', err);
+    return [];
+  }
+}
+
+export async function updateCountrySyncStatus(country, lastSyncOkDate, lastSyncOkTimestamp, syncOk = true) {
+  try {
+    await pool.query(`
+      INSERT INTO country_sync_status (country, last_sync_ok_date, last_sync_ok_timestamp, sync_ok, last_sync_at, updated_at)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT (country) DO UPDATE SET
+        last_sync_ok_date = EXCLUDED.last_sync_ok_date,
+        last_sync_ok_timestamp = EXCLUDED.last_sync_ok_timestamp,
+        sync_ok = EXCLUDED.sync_ok,
+        last_sync_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    `, [country, lastSyncOkDate, lastSyncOkTimestamp, syncOk]);
+    
+    console.log(`[Country Sync Status] Updated ${country.toUpperCase()}: sync_ok=${syncOk}, last_sync_ok_date=${lastSyncOkDate}`);
+  } catch (err) {
+    console.error(`Error updating country sync status for ${country}:`, err);
+    throw err;
+  }
+}
+
+export async function initializeCountrySyncStatus(country, lastSyncOkDate, lastSyncOkTimestamp, syncOk = true) {
+  try {
+    const existing = await getCountrySyncStatus(country);
+    if (!existing) {
+      await updateCountrySyncStatus(country, lastSyncOkDate, lastSyncOkTimestamp, syncOk);
+      console.log(`[Country Sync Status] Initialized ${country.toUpperCase()}: last_sync_ok_date=${lastSyncOkDate}, sync_ok=${syncOk}`);
+    }
+  } catch (err) {
+    console.error(`Error initializing country sync status for ${country}:`, err);
   }
 }
 

@@ -197,7 +197,7 @@ GET /api/                             // Swagger UI documentation
 GET /api/openapi.yaml                 // OpenAPI specification
 ```
 
-**Country Codes**: `lt`, `ee`, `lv`, `fi`, `all` (case insensitive)
+**Country Codes**: `lt`, `ee`, `lv`, `fi` (case insensitive). When supported by an endpoint, omitting the `country` parameter returns data for all countries.
 
 ## 📈 **Performance**
 
@@ -212,6 +212,7 @@ GET /api/openapi.yaml                 // OpenAPI specification
 - **Throughput**: Handles concurrent requests efficiently
 - **Caching**: Database-based caching eliminates external API calls
 - **Proxy Overhead**: Minimal (< 5ms additional latency)
+- **MTU-aware pricing**: Supports both legacy 60-minute and new 15-minute Market Time Units (MTU) from Nord Pool, returning one record per market time unit instead of assuming fixed hourly slots ([Nord Pool MTU transition](https://www.nordpoolgroup.com/en/trading/transition-to-15-minute-market-time-unit-mtu/))
 
 ## 🏗 **Architecture**
 
@@ -266,7 +267,6 @@ GET /api/openapi.yaml                 // OpenAPI specification
 - [x] **Enhanced Swagger UI Integration - COMPLETED**
   - [x] Complete OpenAPI specification documentation
   - [x] Interactive API testing interface
-  - [x] Auto-generated client SDKs
   - [x] Production-ready integration
   - [x] Enhanced documentation with rich descriptions
 
@@ -350,35 +350,6 @@ GET /api/openapi.yaml                 // OpenAPI specification
   - [ ] Anomaly detection
   - [ ] Pattern recognition
   - [ ] Automated insights
-
-## 📊 **SDK Generation**
-
-### **Available Client SDKs**
-The system includes an automated SDK generation script that creates client libraries for multiple programming languages:
-
-```bash
-# Generate all SDKs
-./scripts/generate-sdks.sh
-
-# Generated SDKs will be available in:
-# - generated-sdks/javascript/
-# - generated-sdks/typescript/
-# - generated-sdks/python/
-# - generated-sdks/java/
-# - generated-sdks/csharp/
-# - generated-sdks/go/
-# - generated-sdks/php/
-```
-
-### **Supported Languages**
-- [x] **JavaScript/TypeScript** - Full type safety and Promise-based API
-- [x] **Python** - Native Python client with type hints
-- [x] **Java** - Maven-ready Java client library
-- [x] **C#** - .NET client with async/await support
-- [x] **Go** - Native Go client with context support
-- [x] **PHP** - Composer-ready PHP client
-- [ ] **Rust** - Native Rust client (planned)
-- [ ] **Swift** - iOS/macOS client (planned)
 
 ## 📞 **Support**
 

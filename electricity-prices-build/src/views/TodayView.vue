@@ -14,14 +14,24 @@ const nextDay = moment().add(1, 'days').format('YYYY-MM-DD');
 
 let refreshTimeout = null;
 
+function getIntervalMs() {
+  if (priceData.value && priceData.value.length >= 2) {
+    const diffSec = priceData.value[1].timestamp - priceData.value[0].timestamp;
+    if (diffSec > 0) return diffSec * 1000;
+  }
+  return 60 * 60 * 1000; // default 1 hour
+}
+
 function scheduleNextRefresh() {
   if (refreshTimeout) clearTimeout(refreshTimeout);
-  const now = new Date();
-  const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+  const intervalMs = getIntervalMs();
+  const now = Date.now();
+  const nextBoundary = now - (now % intervalMs) + intervalMs;
+  const delay = Math.max(nextBoundary - now, 5 * 1000);
   refreshTimeout = setTimeout(async () => {
     await reloadPrices();
     scheduleNextRefresh();
-  }, msToNextHour);
+  }, delay);
 }
 
 function handleVisibilityChange() {
@@ -66,28 +76,25 @@ function setTomorrow() {
 
 <template>
   <div class="container">
-    <div class="home-page">
-      <h1 class="mb-3">Electricity Prices</h1>
+    <div class="today-page">
       <div class="d-flex gap-2 mb-3">
         <VueDatePicker v-model="date" locale="lt" month-name-format="long" format="yyyy-MM-dd" 
           auto-apply reverse-years :enable-time-picker="false" 
           :max-date="nextDay" :min-date="minDate" prevent-min-max-navigation 
           class="flex-grow-1" />
-        <button @click="setToday" class="btn btn-secondary">Today</button>
-        <button @click="setTomorrow" class="btn btn-secondary">Tomorrow</button>
+        <button @click="setToday" class="btn btn-secondary">{{ $t('home.today') }}</button>
+        <button @click="setTomorrow" class="btn btn-secondary">{{ $t('home.tomorrow') }}</button>
       </div>
 
       <PriceTable :priceData="priceData" />
       
-      <div class="text-center mt-4">
-        <RouterLink to="/settings" class="btn btn-secondary">Settings</RouterLink>
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.home-page {
-  padding: 1rem;
+.today-page {
+  padding: 0;
 }
 </style>
+

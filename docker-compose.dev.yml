@@ -1,6 +1,4 @@
 # Development overrides
-version: '3.8'
-
 services:
   # Override frontend for development
   frontend:
@@ -8,9 +6,6 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"  # Vite dev server
-    environment:
-      VITE_API_BASE_URL: /api/v1
-      NODE_ENV: development
     command: npm run dev -- --host 0.0.0.0
     volumes:
       - ./electricity-prices-build:/app
@@ -20,9 +15,6 @@ services:
   backend:
     ports:
       - "3000:3000"  # Expose backend for direct access
-    environment:
-      NODE_ENV: development
-      FRONTEND_URL: http://localhost:5173
     command: npm run dev
     volumes:
       - ./backend:/app
@@ -35,9 +27,3 @@ services:
 
   # Swagger UI service for development (internal only)
   swagger-ui:
-    # Swagger UI should not be exposed to the internet - only accessible through frontend proxy
-    # ports:
-    #   - "8080:8080"  # Expose Swagger UI
-    environment:
-      SWAGGER_JSON: /usr/share/nginx/html/api.yaml
-      BASE_URL: /api 
