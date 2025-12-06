@@ -7,15 +7,18 @@ dotenv.config();
 const { Pool } = pg;
 
 // Database connection pool
-const connectionString = process.env.DATABASE_URL || 'postgresql://electricity_user:electricity_password@localhost:5432/electricity_prices';
+// DATABASE_URL is required - no fallback to prevent using incorrect credentials
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('[DATABASE] ERROR: DATABASE_URL environment variable is not set!');
+  console.error('[DATABASE] Please set DATABASE_URL in your environment variables.');
+  process.exit(1);
+}
 
 // Log connection string (without password) for debugging
-if (connectionString) {
-  const safeUrl = connectionString.replace(/:([^:@]+)@/, ':****@');
-  console.log(`[DATABASE] Connecting with: ${safeUrl}`);
-} else {
-  console.error('[DATABASE] ERROR: DATABASE_URL environment variable is not set!');
-}
+const safeUrl = connectionString.replace(/:([^:@]+)@/, ':****@');
+console.log(`[DATABASE] Connecting with: ${safeUrl}`);
 
 const pool = new Pool({
   connectionString: connectionString,
@@ -861,6 +864,75 @@ export async function initializeCountrySyncStatus(country, lastSyncOkDate, lastS
     }
   } catch (err) {
     console.error(`Error initializing country sync status for ${country}:`, err);
+  }
+}
+
+// Initialize database schema if tables don't exist
+// This handles the case where PostgreSQL volume exists but tables weren't created
+export async function initializeDatabaseSchema() {
+  try {
+    console.log('[DATABASE INIT] Checking if database schema needs initialization...');
+    
+    // Check if price_data table exists (quick check)
+    const checkResult = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'price_data'
+      );
+    `);
+    
+    const tableExists = checkResult.rows[0].exists;
+    
+    if (tableExists) {
+      console.log('[DATABASE INIT] Database schema already exists, skipping initialization.');
+      return;
+    }
+    
+    console.log('[DATABASE INIT] Tables not found. Initializing database schema...');
+    
+    // Read and execute schema file
+    const fs = await import('fs');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const { dirname } = await import('path');
+    
+    // Get the directory of the current module
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    
+    // Schema file path (relative to backend/src)
+    const schemaPath = path.join(__dirname, '../../database/init/01_schema.sql');
+    
+    if (!fs.existsSync(schemaPath)) {
+      console.error(`[DATABASE INIT] Schema file not found at: ${schemaPath}`);
+      console.error('[DATABASE INIT] Attempting to read from alternative location...');
+      
+      // Try alternative path (if running from Docker)
+      const altPath = path.join('/app/database/init/01_schema.sql');
+      if (fs.existsSync(altPath)) {
+        const schemaSQL = fs.readFileSync(altPath, 'utf8');
+        await pool.query(schemaSQL);
+        console.log('[DATABASE INIT] Database schema initialized successfully from Docker path.');
+        return;
+      }
+      
+      throw new Error(`Schema file not found at ${schemaPath} or ${altPath}`);
+    }
+    
+    const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+    await pool.query(schemaSQL);
+    
+    console.log('[DATABASE INIT] Database schema initialized successfully.');
+  } catch (err) {
+    // If it's a "relation already exists" error, that's okay - schema was already initialized
+    if (err.message && err.message.includes('already exists')) {
+      console.log('[DATABASE INIT] Schema already initialized (some tables already exist).');
+      return;
+    }
+    
+    console.error('[DATABASE INIT] Error initializing database schema:', err);
+    throw err;
   }
 }
 

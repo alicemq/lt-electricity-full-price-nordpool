@@ -36,8 +36,8 @@ services:
   # Backend API service
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
       args:
         NODE_ENV: ${NODE_ENV:-production}
     container_name: electricity_backend
@@ -47,6 +47,9 @@ services:
       ELERING_API_URL: ${ELERING_API_URL:-https://dashboard.elering.ee/api/nps/price}
       NODE_ENV: ${NODE_ENV:-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    volumes:
+      # Mount schema file so backend can initialize database if needed
+      - ./database/init:/app/database/init:ro
     depends_on:
       db:
         condition: service_healthy

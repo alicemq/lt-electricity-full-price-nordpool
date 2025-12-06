@@ -629,6 +629,15 @@ const server = app.listen(PORT, async () => {
   // Wait for database to be ready before starting sync worker
   await waitForDatabase();
   
+  // Initialize database schema if tables don't exist
+  try {
+    const { initializeDatabaseSchema } = await import('./database.js');
+    await initializeDatabaseSchema();
+  } catch (error) {
+    console.error('[CONTAINER WAKE-UP] Failed to initialize database schema:', error);
+    // Continue anyway - might already be initialized
+  }
+  
   // Start the sync worker after server is ready
   try {
     console.log('[CONTAINER WAKE-UP] Starting sync worker...');
