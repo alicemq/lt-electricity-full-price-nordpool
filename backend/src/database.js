@@ -870,19 +870,30 @@ export async function initializeCountrySyncStatus(country, lastSyncOkDate, lastS
 // Initialize database schema if tables don't exist
 // This handles the case where PostgreSQL volume exists but tables weren't created
 export async function initializeDatabaseSchema() {
+  console.log('[DATABASE INIT] ========================================');
+  console.log('[DATABASE INIT] Starting database schema initialization');
+  console.log('[DATABASE INIT] ========================================');
+  
   try {
-    console.log('[DATABASE INIT] Checking if database schema needs initialization...');
-    
     // Check if price_data table exists (quick check)
-    const checkResult = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'price_data'
-      );
-    `);
+    console.log('[DATABASE INIT] Checking if price_data table exists...');
+    let tableExists = false;
     
-    const tableExists = checkResult.rows[0].exists;
+    try {
+      const checkResult = await pool.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'price_data'
+        );
+      `);
+      tableExists = checkResult.rows[0].exists;
+      console.log(`[DATABASE INIT] Table check result: ${tableExists ? 'EXISTS' : 'NOT FOUND'}`);
+    } catch (checkErr) {
+      console.error('[DATABASE INIT] Error checking for tables:', checkErr.message);
+      // If check fails, assume tables don't exist and try to create them
+      tableExists = false;
+    }
     
     if (tableExists) {
       console.log('[DATABASE INIT] Database schema already exists, skipping initialization.');
@@ -900,30 +911,43 @@ export async function initializeDatabaseSchema() {
     // Get the directory of the current module
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
+    console.log(`[DATABASE INIT] Current module directory: ${__dirname}`);
     
-    // Schema file path (relative to backend/src)
-    const schemaPath = path.join(__dirname, '../../database/init/01_schema.sql');
+    // Try multiple possible paths
+    const possiblePaths = [
+      path.join(__dirname, '../../database/init/01_schema.sql'),  // From backend/src
+      path.join('/app/database/init/01_schema.sql'),              // Docker volume mount
+      path.join(process.cwd(), 'database/init/01_schema.sql'),    // From working directory
+    ];
     
-    if (!fs.existsSync(schemaPath)) {
-      console.error(`[DATABASE INIT] Schema file not found at: ${schemaPath}`);
-      console.error('[DATABASE INIT] Attempting to read from alternative location...');
-      
-      // Try alternative path (if running from Docker)
-      const altPath = path.join('/app/database/init/01_schema.sql');
-      if (fs.existsSync(altPath)) {
-        const schemaSQL = fs.readFileSync(altPath, 'utf8');
-        await pool.query(schemaSQL);
-        console.log('[DATABASE INIT] Database schema initialized successfully from Docker path.');
-        return;
+    console.log('[DATABASE INIT] Trying to find schema file...');
+    let schemaSQL = null;
+    let foundPath = null;
+    
+    for (const schemaPath of possiblePaths) {
+      console.log(`[DATABASE INIT] Checking: ${schemaPath}`);
+      if (fs.existsSync(schemaPath)) {
+        console.log(`[DATABASE INIT] ✓ Found schema file at: ${schemaPath}`);
+        schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+        foundPath = schemaPath;
+        break;
+      } else {
+        console.log(`[DATABASE INIT] ✗ Not found at: ${schemaPath}`);
       }
-      
-      throw new Error(`Schema file not found at ${schemaPath} or ${altPath}`);
     }
     
-    const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+    if (!schemaSQL) {
+      throw new Error(`Schema file not found in any of these locations:\n${possiblePaths.join('\n')}`);
+    }
+    
+    console.log(`[DATABASE INIT] Schema file loaded (${schemaSQL.length} characters)`);
+    console.log('[DATABASE INIT] Executing schema SQL...');
+    
+    // Execute the schema SQL
     await pool.query(schemaSQL);
     
-    console.log('[DATABASE INIT] Database schema initialized successfully.');
+    console.log('[DATABASE INIT] ✓ Database schema initialized successfully!');
+    console.log('[DATABASE INIT] ========================================');
   } catch (err) {
     // If it's a "relation already exists" error, that's okay - schema was already initialized
     if (err.message && err.message.includes('already exists')) {
@@ -931,7 +955,10 @@ export async function initializeDatabaseSchema() {
       return;
     }
     
-    console.error('[DATABASE INIT] Error initializing database schema:', err);
+    console.error('[DATABASE INIT] ✗ ERROR initializing database schema:');
+    console.error('[DATABASE INIT] Error message:', err.message);
+    console.error('[DATABASE INIT] Error stack:', err.stack);
+    console.error('[DATABASE INIT] ========================================');
     throw err;
   }
 }

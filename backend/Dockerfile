@@ -18,7 +18,8 @@ RUN if [ "$NODE_ENV" = "development" ]; then \
 # Copy source code
 COPY backend/src/ ./src/
 
-# Copy database schema for initialization (build context is now root)
+# Create directory and copy database schema for initialization (build context is now root)
+RUN mkdir -p ./database/init
 COPY database/init/01_schema.sql ./database/init/01_schema.sql
 
 # Create non-root user

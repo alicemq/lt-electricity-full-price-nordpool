@@ -630,11 +630,16 @@ const server = app.listen(PORT, async () => {
   await waitForDatabase();
   
   // Initialize database schema if tables don't exist
+  console.log('[CONTAINER WAKE-UP] About to initialize database schema...');
   try {
     const { initializeDatabaseSchema } = await import('./database.js');
+    console.log('[CONTAINER WAKE-UP] initializeDatabaseSchema function imported, calling it...');
     await initializeDatabaseSchema();
+    console.log('[CONTAINER WAKE-UP] Database schema initialization completed.');
   } catch (error) {
-    console.error('[CONTAINER WAKE-UP] Failed to initialize database schema:', error);
+    console.error('[CONTAINER WAKE-UP] ✗ Failed to initialize database schema:');
+    console.error('[CONTAINER WAKE-UP] Error:', error.message);
+    console.error('[CONTAINER WAKE-UP] Stack:', error.stack);
     // Continue anyway - might already be initialized
   }
   
