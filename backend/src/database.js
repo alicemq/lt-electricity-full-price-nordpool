@@ -915,8 +915,8 @@ export async function initializeDatabaseSchema() {
     
     // Try multiple possible paths
     const possiblePaths = [
-      path.join(__dirname, '../../database/init/01_schema.sql'),  // From backend/src
-      path.join('/app/database/init/01_schema.sql'),              // Docker volume mount
+      path.join('/app/database/init/01_schema.sql'),              // Docker - primary path
+      path.join(__dirname, '../database/init/01_schema.sql'),     // From backend/src (if no volume mount)
       path.join(process.cwd(), 'database/init/01_schema.sql'),    // From working directory
     ];
     
