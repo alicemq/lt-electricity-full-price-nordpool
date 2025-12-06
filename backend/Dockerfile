@@ -6,7 +6,7 @@ WORKDIR /app
 ARG NODE_ENV=production
 
 # Copy package files
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # Install dependencies based on environment
 RUN if [ "$NODE_ENV" = "development" ]; then \
@@ -16,7 +16,7 @@ RUN if [ "$NODE_ENV" = "development" ]; then \
     fi
 
 # Copy source code
-COPY src/ ./src/
+COPY backend/src/ ./src/
 
 # Copy database schema for initialization (build context is now root)
 COPY database/init/01_schema.sql ./database/init/01_schema.sql
