@@ -44,12 +44,12 @@ info:
     description: 'Project Documentation'
     url: 'https://github.com/your-repo/electricity-prices/blob/main/README.md'
 servers:
+  - url: /api/v1
+    description: 'Production API Server (via proxy)'
   - url: 'http://localhost:3000/api/v1'
     description: 'Development API Server'
   - url: 'http://backend:3000/api/v1'
     description: 'Docker Internal API Server'
-  - url: /api/v1
-    description: 'Production API Server (via proxy)'
 paths:
   /health:
     get:
