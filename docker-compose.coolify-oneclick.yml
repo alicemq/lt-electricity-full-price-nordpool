@@ -93,8 +93,8 @@ services:
     image: swaggerapi/swagger-ui:latest
     container_name: electricity_swagger_ui
     environment:
-      # Load spec from URL (via nginx proxy) - more reliable than file path
-      SWAGGER_URL: /api/openapi.yaml
+      # Swagger UI configurator looks for SWAGGER_JSON_URL to set the default spec URL
+      SWAGGER_JSON_URL: /api/openapi.yaml
       BASE_URL: /api
     volumes:
       # Mount spec files so nginx can serve them

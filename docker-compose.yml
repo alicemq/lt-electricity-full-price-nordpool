@@ -72,11 +72,13 @@ services:
     image: swaggerapi/swagger-ui:latest
     container_name: electricity_swagger_ui
     environment:
-      SWAGGER_JSON: /spec/openapi.yaml
+      # Swagger UI configurator looks for SWAGGER_JSON_URL to set the default spec URL
+      SWAGGER_JSON_URL: /api/openapi.yaml
       BASE_URL: /api
     volumes:
-      - ./swagger-ui/openapi.yaml:/spec/openapi.yaml:ro
-      - ./swagger-ui/openapi.json:/spec/openapi.json:ro
+      # Mount spec files so nginx can serve them
+      - ./swagger-ui/openapi.yaml:/usr/share/nginx/html/openapi.yaml:ro
+      - ./swagger-ui/openapi.json:/usr/share/nginx/html/openapi.json:ro
     networks:
       - electricity_network
     restart: unless-stopped
