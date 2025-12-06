@@ -367,13 +367,13 @@ INSERT INTO time_schedules (country, zone_name, schedule_type, day_type, hour_0,
 -- Four zones - alltime - weekend
 ('lt', 'Four zones', 'alltime', 'weekend', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'night', 'night'),
 -- Two zones - wintertime - mondayToFriday
-('lt', 'Two zones', 'wintertime', 'mondayToFriday', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'night'),
+('lt', 'Two zones', 'wintertime', 'mondayToFriday', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'night', 'night'),
 -- Two zones - wintertime - weekend
-('lt', 'Two zones', 'wintertime', 'weekend', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night'),
+('lt', 'Two zones', 'wintertime', 'weekend', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night'),
 -- Two zones - summertime - mondayToFriday
 ('lt', 'Two zones', 'summertime', 'mondayToFriday', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day'),
 -- Two zones - summertime - weekend
-('lt', 'Two zones', 'summertime', 'weekend', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night'),
+('lt', 'Two zones', 'summertime', 'weekend', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night', 'night'),
 -- Single zone - alltime - mondayToFriday
 ('lt', 'Single zone', 'alltime', 'mondayToFriday', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day', 'day'),
 -- Single zone - alltime - weekend
