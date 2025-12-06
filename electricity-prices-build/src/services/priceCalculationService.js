@@ -58,17 +58,13 @@ function getPricesForDate(date, country = 'lt') {
   const dateStr = moment(date).format('YYYY-MM-DD');
   const configToUse = priceConfigCache[country] || {};
   
-  // Find applicable tariff period
-  const tariffPeriods = Object.keys(configToUse.tariffs || {}).sort();
-  const applicableTariffPeriod = tariffPeriods.reduce((prev, curr) => {
-    return dateStr >= curr ? curr : prev;
-  }, tariffPeriods[0] || '');
+  // Find applicable tariff period (most recent date <= current date)
+  const tariffPeriods = Object.keys(configToUse.tariffs || {}).sort().reverse(); // Sort descending
+  const applicableTariffPeriod = tariffPeriods.find(period => dateStr >= period) || tariffPeriods[tariffPeriods.length - 1] || '';
   
-  // Find applicable system charges period
-  const chargePeriods = Object.keys(configToUse.systemCharges || {}).sort();
-  const applicableChargePeriod = chargePeriods.reduce((prev, curr) => {
-    return dateStr >= curr ? curr : prev;
-  }, chargePeriods[0] || '');
+  // Find applicable system charges period (most recent date <= current date)
+  const chargePeriods = Object.keys(configToUse.systemCharges || {}).sort().reverse(); // Sort descending
+  const applicableChargePeriod = chargePeriods.find(period => dateStr >= period) || chargePeriods[chargePeriods.length - 1] || '';
 
   return {
     tariffs: configToUse.tariffs?.[applicableTariffPeriod] || {},
@@ -88,6 +84,11 @@ function getDistributionPrice(time, country = 'lt') {
   
   if (!plan) {
     console.warn(`No plan found for country ${country}, zone ${state.value.zone}, plan ${state.value.plan}`);
+    console.warn(`Available zones:`, Object.keys(prices.tariffs || {}));
+    if (prices.tariffs[state.value.zone]) {
+      console.warn(`Available plans for ${state.value.zone}:`, Object.keys(prices.tariffs[state.value.zone]));
+    }
+    console.warn(`Price config cache for ${country}:`, priceConfigCache[country]);
     return 0;
   }
   
