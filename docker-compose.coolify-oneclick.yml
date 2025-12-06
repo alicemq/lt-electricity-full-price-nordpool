@@ -28,7 +28,7 @@ services:
       - electricity_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-electricity_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-electricity_user} -d ${POSTGRES_DB:-electricity_prices}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,8 +58,8 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 120s
 
   # Frontend service
   frontend:

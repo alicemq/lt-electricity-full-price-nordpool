@@ -7,8 +7,18 @@ dotenv.config();
 const { Pool } = pg;
 
 // Database connection pool
+const connectionString = process.env.DATABASE_URL || 'postgresql://electricity_user:electricity_password@localhost:5432/electricity_prices';
+
+// Log connection string (without password) for debugging
+if (connectionString) {
+  const safeUrl = connectionString.replace(/:([^:@]+)@/, ':****@');
+  console.log(`[DATABASE] Connecting with: ${safeUrl}`);
+} else {
+  console.error('[DATABASE] ERROR: DATABASE_URL environment variable is not set!');
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://electricity_user:electricity_password@localhost:5432/electricity_prices',
+  connectionString: connectionString,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
