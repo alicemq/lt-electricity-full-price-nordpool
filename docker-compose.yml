@@ -47,8 +47,8 @@ services:
   # Frontend service (acts as proxy to backend)
   frontend:
     build:
-      context: ./electricity-prices-build
-      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile.prod}
+      context: .
+      dockerfile: ./electricity-prices-build/Dockerfile.prod
       args:
         NODE_ENV: ${NODE_ENV:-production}
     container_name: electricity_frontend

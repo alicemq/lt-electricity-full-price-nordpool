@@ -3,7 +3,7 @@ FROM node:20-alpine as build
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY electricity-prices-build/package*.json ./
 
 # Install ALL dependencies (including devDependencies) for build
 # Dev dependencies like vite are needed for building, even in production
@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN NODE_ENV=development npm install
 
 # Copy source code
-COPY . .
+COPY electricity-prices-build/ .
 
 # Build the application
 RUN npm run build
@@ -22,8 +22,12 @@ FROM nginx:stable-alpine
 # Copy built application
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Copy OpenAPI spec files for Swagger UI
+COPY swagger-ui/openapi.yaml /usr/share/nginx/html/openapi.yaml
+COPY swagger-ui/openapi.json /usr/share/nginx/html/openapi.json
+
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY electricity-prices-build/nginx.conf /etc/nginx/nginx.conf
 
 # Expose port
 EXPOSE 80

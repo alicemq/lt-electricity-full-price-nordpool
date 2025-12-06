@@ -130,17 +130,20 @@ const groupedByHour = computed(() => {
     const m = moment.unix(item.timestamp);
     const date = m.format('YYYY-MM-DD');
     const hour = parseInt(m.format('HH'), 10);
+    const hourStr = m.format('HH');
     const lastSlot = currentGroup?.slots[currentGroup.slots.length - 1];
     
     // Start a new group if:
     // 1. No current group
     // 2. Different date
-    // 3. Timestamp difference is > 1 hour (new hour or DST transition)
-    // 4. Current group is full (slotsPerHour slots) - this handles DST fall back where same hour repeats
+    // 3. Different hour number (handles hour transitions for 15-min intervals)
+    // 4. Timestamp difference is > 1 hour (new hour or DST transition)
+    // 5. Current group is full (slotsPerHour slots) - this handles DST fall back where same hour repeats
+    const hourChanged = currentGroup && currentGroup.hour !== hourStr;
     const isNewHour = !lastSlot || (item.timestamp - lastSlot.timestamp) > 3600;
     const isGroupFull = currentGroup && currentGroup.slots.length >= slotsPerHour.value;
     
-    if (!currentGroup || currentGroup.date !== date || isNewHour || isGroupFull) {
+    if (!currentGroup || currentGroup.date !== date || hourChanged || isNewHour || isGroupFull) {
       // Save previous group if it exists
       if (currentGroup) {
         // Pad previous group to slotsPerHour
@@ -152,9 +155,9 @@ const groupedByHour = computed(() => {
       
       // Start new group
       currentGroup = {
-        key: `${date}-${hour}-${item.timestamp}`, // Include timestamp to handle duplicate hours
+        key: `${date}-${hourStr}-${item.timestamp}`, // Include timestamp to handle duplicate hours
         date,
-        hour: m.format('HH'),
+        hour: hourStr,
         slots: [item]
       };
     } else {

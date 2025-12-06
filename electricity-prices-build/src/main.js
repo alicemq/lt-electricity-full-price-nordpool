@@ -1,4 +1,7 @@
 import './assets/main.css'
+// Import Bootstrap and Bootswatch Solar theme (bundled, not CDN)
+import 'bootswatch/dist/solar/bootstrap.min.css'
+import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import VueDatePicker from '@vuepic/vue-datepicker'

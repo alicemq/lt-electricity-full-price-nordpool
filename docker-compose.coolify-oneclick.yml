@@ -64,8 +64,8 @@ services:
   # Frontend service
   frontend:
     build:
-      context: ./electricity-prices-build
-      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile.prod}
+      context: .
+      dockerfile: ./electricity-prices-build/Dockerfile.prod
       args:
         NODE_ENV: ${NODE_ENV:-production}
     container_name: electricity_frontend
@@ -93,11 +93,13 @@ services:
     image: swaggerapi/swagger-ui:latest
     container_name: electricity_swagger_ui
     environment:
-      SWAGGER_JSON: /spec/openapi.yaml
+      # Load spec from URL (via nginx proxy) - more reliable than file path
+      SWAGGER_URL: /api/openapi.yaml
       BASE_URL: /api
     volumes:
-      - ./swagger-ui/openapi.yaml:/spec/openapi.yaml:ro
-      - ./swagger-ui/openapi.json:/spec/openapi.json:ro
+      # Mount spec files so nginx can serve them
+      - ./swagger-ui/openapi.yaml:/usr/share/nginx/html/openapi.yaml:ro
+      - ./swagger-ui/openapi.json:/usr/share/nginx/html/openapi.json:ro
     networks:
       - electricity_network
     restart: unless-stopped
