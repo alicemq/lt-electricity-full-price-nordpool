@@ -210,24 +210,27 @@ class SyncWorker {
     
     // Check daily sync job
     if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
+      const hasNextRun = this.dailySyncJobs.some(job => job.nextDate && job.nextDate());
       jobs['Daily Sync'] = {
-        scheduled: this.dailySyncJobs.some(job => job.running),
+        scheduled: hasNextRun,
         nextRun: this.dailySyncJobs.map(job => job.nextDate ? job.nextDate().toISOString() : null).filter(Boolean).sort()[0] || null
       };
     }
     
     // Check weekly sync job
     if (this.weeklySyncJob) {
+      const hasNextRun = this.weeklySyncJob.nextDate && this.weeklySyncJob.nextDate();
       jobs['Weekly Sync'] = {
-        scheduled: this.weeklySyncJob.running,
+        scheduled: hasNextRun,
         nextRun: this.weeklySyncJob.nextDate ? this.weeklySyncJob.nextDate().toISOString() : null
       };
     }
     
     // Check next day sync job
     if (this.nextDaySyncJob) {
+      const hasNextRun = this.nextDaySyncJob.nextDate && this.nextDaySyncJob.nextDate();
       jobs['Next Day Sync'] = {
-        scheduled: this.nextDaySyncJob.running,
+        scheduled: hasNextRun,
         nextRun: this.nextDaySyncJob.nextDate ? this.nextDaySyncJob.nextDate().toISOString() : null
       };
     }
@@ -1731,23 +1734,54 @@ class SyncWorker {
       const countries = ['lt', 'ee', 'lv', 'fi'];
       const now = moment().tz('Europe/Vilnius');
       const tomorrow = now.clone().add(1, 'day').startOf('day');
-      const tomorrowLastHour = tomorrow.clone().add(23, 'hours');
+
+      console.log(`[Next Day Sync Check] Checking if sync needed for ${tomorrow.format('YYYY-MM-DD')}`);
+      console.log(`[Next Day Sync Check] Comparing database latest timestamps with Elering API latest endpoint`);
 
       for (const country of countries) {
-        const latestTimestamp = await this.getLatestPriceTimestamp(country);
-        if (!latestTimestamp) {
+        // Get our database's latest timestamp
+        const ourLatestTimestamp = await this.getLatestPriceTimestamp(country);
+        if (!ourLatestTimestamp) {
+          console.log(`[Next Day Sync Check] ${country.toUpperCase()}: No data in database - sync needed`);
           return true; // No data at all
         }
 
-        const latestDate = moment.unix(latestTimestamp).tz('Europe/Vilnius');
-        
-        // Check if we have tomorrow's data up to the last hour
-        if (latestDate.isBefore(tomorrowLastHour)) {
-          return true; // Missing tomorrow's data
+        const ourLatestDate = moment.unix(ourLatestTimestamp).tz('Europe/Vilnius');
+        console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Database latest: ${ourLatestDate.format('YYYY-MM-DD HH:mm:ss')} (CET)`);
+
+        // Get Elering's latest timestamp from their /latest endpoint
+        let eleringLatestTimestamp = null;
+        try {
+          eleringLatestTimestamp = await this.api.getLatestTimestamp(country);
+        } catch (error) {
+          console.warn(`[Next Day Sync Check] ${country.toUpperCase()}: Failed to fetch Elering latest timestamp: ${error.message}`);
+          // If we can't check Elering, assume we need to sync to be safe
+          return true;
+        }
+
+        if (!eleringLatestTimestamp) {
+          console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Elering has no latest data - skipping check for this country`);
+          continue; // Skip this country if Elering has no data
+        }
+
+        const eleringLatestDate = moment.unix(eleringLatestTimestamp).tz('Europe/Vilnius');
+        console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Elering latest: ${eleringLatestDate.format('YYYY-MM-DD HH:mm:ss')} (CET)`);
+
+        // Compare timestamps - if Elering has newer data, we need to sync
+        if (eleringLatestTimestamp > ourLatestTimestamp) {
+          const diffMinutes = eleringLatestDate.diff(ourLatestDate, 'minutes');
+          console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Elering has newer data (${diffMinutes} minutes ahead) - sync needed`);
+          return true; // Elering has newer data
+        } else if (eleringLatestTimestamp < ourLatestTimestamp) {
+          const diffMinutes = ourLatestDate.diff(eleringLatestDate, 'minutes');
+          console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Database is ahead of Elering (${diffMinutes} minutes ahead) - OK`);
+        } else {
+          console.log(`[Next Day Sync Check] ${country.toUpperCase()}: Database is up-to-date with Elering - OK`);
         }
       }
       
-      return false; // All countries have complete tomorrow data
+      console.log(`[Next Day Sync Check] All countries are up-to-date with Elering - sync not needed`);
+      return false; // All countries are up-to-date
     } catch (error) {
       console.error('Error checking next day sync need:', error);
       return true; // Default to sync if check fails

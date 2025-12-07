@@ -642,7 +642,7 @@ const server = app.listen(PORT, async () => {
     console.error('[CONTAINER WAKE-UP] Stack:', error.stack);
     // Continue anyway - might already be initialized
   }
-
+  
   // Run database migrations
   console.log('[CONTAINER WAKE-UP] About to run database migrations...');
   try {

@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+
+# Google-specific rules
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Googlebot-Image
+Allow: /android-chrome-*.png
+Allow: /apple-touch-icon.png
+Allow: /favicon-*.png
+
+# Sitemap location
+Sitemap: https://elektra.teletigras.lt/sitemap.xml
+
+# Disallow API endpoints from being indexed
+Disallow: /api/
+
+# Disallow JSON endpoints
+Disallow: /todayprices
+Disallow: /futureprices
+
