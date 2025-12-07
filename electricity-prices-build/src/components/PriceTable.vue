@@ -113,6 +113,15 @@ const formatMinuteLabel = (timestamp) => {
   return `<sup>${minute}</sup>`;
 };
 
+const formatPriceWithSmallDecimals = (price) => {
+  const formatted = price.toFixed(3);
+  const parts = formatted.split('.');
+  if (parts.length === 2) {
+    return `${parts[0]}.<span class="price-decimal">${parts[1]}</span>`;
+  }
+  return formatted;
+};
+
 const getPeriodLabel = (timestamp) => {
   const period = getTimePeriod(timestamp);
   // Map period to display labels
@@ -219,7 +228,7 @@ const groupedByHour = computed(() => {
           ]"
         >
           <td v-html="formatPriceHours(price.timestamp, intervalSeconds)"></td>
-          <td>{{ calculatePrice(price).toFixed(3) }}</td>
+          <td v-html="formatPriceWithSmallDecimals(calculatePrice(price))"></td>
         </tr>
       </tbody>
       <tbody v-else>
@@ -244,7 +253,7 @@ const groupedByHour = computed(() => {
                 isCurrentHourClass(slot.timestamp)
               ]"
             >
-              {{ calculatePrice(slot).toFixed(3) }}
+              <span v-html="formatPriceWithSmallDecimals(calculatePrice(slot))"></span>
             </td>
             <td v-else></td>
           </template>
@@ -275,7 +284,7 @@ const groupedByHour = computed(() => {
 </template>
 
 <style scoped>
-/* Mobile: compact table to fit without horizontal scrolling */
+/* Mobile: narrow columns to fit without horizontal scrolling */
 @media (max-width: 767.98px) {
   .table-responsive {
     margin-left: -0.25rem;
@@ -287,29 +296,36 @@ const groupedByHour = computed(() => {
   
   .table-responsive .table {
     margin-bottom: 0;
-    font-size: 0.75rem;
+    table-layout: auto;
+    font-size: 1.25rem;
   }
   
+  /* Narrow cells - minimal horizontal padding */
   .table th,
   .table td {
-    padding: 0.25rem 0.35rem;
+    padding: 0.5rem 0.15rem;
     white-space: nowrap;
+  }
+  
+  /* First column (time) - minimal width */
+  .table th:first-child,
+  .table td:first-child {
+    padding-right: 0.3rem;
+    width: auto;
+    min-width: auto;
+  }
+  
+  /* Price columns - very narrow */
+  .table th:not(:first-child),
+  .table td:not(:first-child) {
+    padding-left: 0.15rem !important;
+    padding-right: 0.15rem !important;
+    text-align: center;
   }
   
   /* Compact header */
   .table thead th {
-    font-size: 0.7rem;
     font-weight: 600;
-  }
-  
-  /* Hide average badge on mobile in grouped view */
-  .table thead th .badge {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-  }
-  
-  .table thead th .fw-bold {
-    font-size: 0.7rem;
   }
   
   /* Ensure sticky header doesn't hide content */
@@ -321,8 +337,25 @@ const groupedByHour = computed(() => {
   
   /* Compact buttons */
   .btn-group-sm .btn {
-    font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
   }
+  
+  /* Reduce gap in header */
+  .table thead th .d-flex.gap-2 {
+    gap: 0.25rem !important;
+  }
+  
+  /* Make badge more compact */
+  .table thead th .badge {
+    padding: 0.25rem 0.4rem;
+  }
+}
+</style>
+
+<style>
+/* Make decimal part 25% smaller (75% of base size) - non-scoped for v-html content */
+.price-decimal {
+  font-size: 0.7em;
 }
 </style>
