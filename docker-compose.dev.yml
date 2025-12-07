@@ -3,6 +3,7 @@ services:
   # Override frontend for development
   frontend:
     build:
+      context: ./electricity-prices-build
       dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"  # Vite dev server

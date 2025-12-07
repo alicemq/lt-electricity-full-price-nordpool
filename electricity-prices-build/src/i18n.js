@@ -17,7 +17,12 @@ const messages = {
       title: 'Upcoming Prices',
       loading: 'Loading prices...',
       error: 'Failed to load prices.',
-      empty: 'No upcoming prices available.'
+      empty: 'No upcoming prices available.',
+      displaySettings: 'Display Settings',
+      numberOfHours: 'Number of hours',
+      currentHourFontSize: 'Current hour font size (px)',
+      otherHoursFontSize: 'Other hours font size (px)',
+      darkTheme: 'Dark theme'
     },
     settings: {
       title: 'Settings',
@@ -49,7 +54,9 @@ const messages = {
       noData: 'Price data is not yet available for selected date.\nData is typically available after 15:00 local time (13:00 UTC).',
       intervalHeader: 'Interval',
       priceHeader: 'Price ct/kWh',
-      hourHeader: 'Hour',
+      hourHeader: 'Prices in cents',
+      timeHeader: 'Time',
+      priceHeaderShort: 'Price',
       averageLabel: 'Average Price:',
       perInterval: 'Per interval',
       perHour: 'Per hour'
@@ -111,7 +118,12 @@ const messages = {
       title: 'Artimiausios kainos',
       loading: 'Kraunamos kainos...',
       error: 'Nepavyko įkelti kainų.',
-      empty: 'Nėra artimiausių kainų.'
+      empty: 'Nėra artimiausių kainų.',
+      displaySettings: 'Rodymo nustatymai',
+      numberOfHours: 'Valandų skaičius',
+      currentHourFontSize: 'Dabartinės valandos šrifto dydis (px)',
+      otherHoursFontSize: 'Kitų valandų šrifto dydis (px)',
+      darkTheme: 'Tamsi tema'
     },
     settings: {
       title: 'Nustatymai',
@@ -143,7 +155,9 @@ const messages = {
       noData: 'Šiai datai kainų duomenys dar nepasiekiami.\nDuomenys įprastai pasiekiami po 15:00 vietos laiku (13:00 UTC).',
       intervalHeader: 'Intervalas',
       priceHeader: 'Kaina ct/kWh',
-      hourHeader: 'Valanda',
+      hourHeader: 'Kainos centais',
+      timeHeader: 'Laikas',
+      priceHeaderShort: 'Kaina',
       averageLabel: 'Vidutinė kaina:',
       perInterval: 'Pagal intervalus',
       perHour: 'Pagal valandas'

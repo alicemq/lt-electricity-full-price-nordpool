@@ -284,9 +284,8 @@ export function stopNextDayDataChecker() {
 export async function initializeCache(country = 'lt') {
     if (!needsInitialization()) {
         console.log('Cache already initialized, checking for future gaps...');
-        // Only check for FUTURE gaps (historical gaps fetched on-demand)
-        // Check for next day data if after 15:00 CET
-        await checkAndFetchNextDayData(country);
+        // Don't call checkAndFetchNextDayData here - it will be called by startNextDayDataChecker
+        // This avoids duplicate calls since startNextDayDataChecker runs immediately on start
         return;
     }
     
@@ -311,8 +310,8 @@ export async function initializeCache(country = 'lt') {
         // Also fetch upcoming data to ensure we have the latest (this will merge with existing cache)
         await fetchUpcomingPrices(country);
         
-        // If after 15:00 CET, also check for next day data
-        await checkAndFetchNextDayData(country);
+        // Don't call checkAndFetchNextDayData here - it will be called by startNextDayDataChecker
+        // This avoids duplicate calls since startNextDayDataChecker runs immediately on start
         
         console.log('Cache initialized successfully');
     } catch (error) {

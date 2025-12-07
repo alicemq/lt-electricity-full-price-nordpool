@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import PriceTable from '../components/PriceTable.vue';
 import { fetchUpcomingPrices } from '../services/priceService';
-import { calculatePrice } from '../services/priceCalculationService';
+import { calculatePrice, logAllPriceBreakdowns } from '../services/priceCalculationService';
 import { formatPriceHours, formatLocalTime } from '../services/timeService';
 import moment from 'moment-timezone';
 
@@ -71,6 +71,9 @@ const loadPrices = async () => {
     }));
     
     console.log(calculatedPrices);
+    
+    // Debug: Log all price components breakdown for each hour
+    logAllPriceBreakdowns();
     
   } catch (e) {
     error.value = e.message;

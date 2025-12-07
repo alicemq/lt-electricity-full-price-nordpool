@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import moment from 'moment-timezone';
 import { formatPriceHours, isCurrentHour } from '../services/timeService';
-import { calculatePrice } from '../services/priceCalculationService';
+import { calculatePrice, getTimePeriod } from '../services/priceCalculationService';
 import { getPriceClass } from '../utils/priceColor';
 
 const props = defineProps({
@@ -113,6 +113,18 @@ const formatMinuteLabel = (timestamp) => {
   return `<sup>${minute}</sup>`;
 };
 
+const getPeriodLabel = (timestamp) => {
+  const period = getTimePeriod(timestamp);
+  // Map period to display labels
+  const labels = {
+    'night': 'Night',
+    'morning': 'Morning',
+    'day': 'Day',
+    'evening': 'Evening'
+  };
+  return labels[period] || period;
+};
+
 const slotsPerHour = computed(() => (intervalSeconds.value === 900 ? 4 : 1));
 
 const groupedByHour = computed(() => {
@@ -186,10 +198,13 @@ const groupedByHour = computed(() => {
     <table class="table table-hover align-middle">
       <thead>
         <tr>
-          <th :colspan="layoutMode === 'slot' ? 2 : (1 + slotsPerHour * 2)" class="text-end sticky-top bg-body">
+          <th v-if="layoutMode === 'slot'">{{ $t('table.timeHeader') }}</th>
+          <th v-if="layoutMode === 'slot'">{{ $t('table.priceHeaderShort') }}</th>
+          <th v-else></th>
+          <th :colspan="layoutMode === 'slot' ? 0 : slotsPerHour * 2" class="text-end sticky-top bg-body">
             <div class="d-flex align-items-center justify-content-end gap-2">
               <span class="fw-bold mb-0">{{ $t('table.averageLabel') }}</span>
-              <span class="badge bg-primary">{{ averagePrice.toFixed(2) }} ct/kWh</span>
+              <span class="badge bg-primary">{{ averagePrice.toFixed(3) }} ct/kWh</span>
             </div>
           </th>
         </tr>
@@ -204,7 +219,7 @@ const groupedByHour = computed(() => {
           ]"
         >
           <td v-html="formatPriceHours(price.timestamp, intervalSeconds)"></td>
-          <td>{{ calculatePrice(price) }}</td>
+          <td>{{ calculatePrice(price).toFixed(3) }}</td>
         </tr>
       </tbody>
       <tbody v-else>
@@ -229,7 +244,7 @@ const groupedByHour = computed(() => {
                 isCurrentHourClass(slot.timestamp)
               ]"
             >
-              {{ calculatePrice(slot) }}
+              {{ calculatePrice(slot).toFixed(3) }}
             </td>
             <td v-else></td>
           </template>

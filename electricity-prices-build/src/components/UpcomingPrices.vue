@@ -57,12 +57,12 @@ const themeClass = computed(() => {
     <!-- Settings Panel -->
     <div class="card mb-3">
       <div class="card-header">
-        <h5 class="card-title">Display Settings</h5>
+        <h5 class="card-title">{{ $t('upcoming.displaySettings') }}</h5>
       </div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">Number of hours</label>
+            <label class="form-label">{{ $t('upcoming.numberOfHours') }}</label>
             <input 
               type="number" 
               class="form-control" 
@@ -80,11 +80,11 @@ const themeClass = computed(() => {
                 v-model="settings.isDarkTheme"
                 @change="saveSettings"
               >
-              <label class="form-check-label">Dark theme</label>
+              <label class="form-check-label">{{ $t('upcoming.darkTheme') }}</label>
             </div>
           </div>
           <div class="col-md-6">
-            <label class="form-label">Current hour font size (px)</label>
+            <label class="form-label">{{ $t('upcoming.currentHourFontSize') }}</label>
             <input 
               type="number" 
               class="form-control" 
@@ -95,7 +95,7 @@ const themeClass = computed(() => {
             >
           </div>
           <div class="col-md-6">
-            <label class="form-label">Other hours font size (px)</label>
+            <label class="form-label">{{ $t('upcoming.otherHoursFontSize') }}</label>
             <input 
               type="number" 
               class="form-control" 

@@ -1,8 +1,9 @@
 <script setup>
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { RouterLink } from 'vue-router'
 import moment from 'moment-timezone';
 import { fetchPrices } from '../services/priceService';
+import { logAllPriceBreakdowns } from '../services/priceCalculationService';
 import PriceTable from '../components/PriceTable.vue';
 
 moment.tz.setDefault("Europe/Vilnius");
@@ -45,6 +46,9 @@ async function reloadPrices() {
   try {
     const data = await fetchPrices(date.value);
     priceData.value = data.data?.lt || [];
+    // Debug: Log price breakdowns after prices are loaded and calculated
+    await nextTick();
+    logAllPriceBreakdowns();
   } catch (error) {
     priceData.value = [];
   }
