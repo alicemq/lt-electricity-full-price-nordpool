@@ -275,5 +275,54 @@ const groupedByHour = computed(() => {
 </template>
 
 <style scoped>
-/* Remove all custom styling and rely on Bootstrap classes */
+/* Mobile: compact table to fit without horizontal scrolling */
+@media (max-width: 767.98px) {
+  .table-responsive {
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    overflow-x: visible;
+  }
+  
+  .table-responsive .table {
+    margin-bottom: 0;
+    font-size: 0.75rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.25rem 0.35rem;
+    white-space: nowrap;
+  }
+  
+  /* Compact header */
+  .table thead th {
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  
+  /* Hide average badge on mobile in grouped view */
+  .table thead th .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .table thead th .fw-bold {
+    font-size: 0.7rem;
+  }
+  
+  /* Ensure sticky header doesn't hide content */
+  .sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  /* Compact buttons */
+  .btn-group-sm .btn {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
 </style>

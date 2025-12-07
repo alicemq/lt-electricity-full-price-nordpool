@@ -22,6 +22,9 @@ COPY backend/src/ ./src/
 RUN mkdir -p ./database/init
 COPY database/init/01_schema.sql ./database/init/01_schema.sql
 
+# Note: Migrations are mounted as a volume at runtime via docker-compose.yml
+# No need to copy them during build
+
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001

@@ -96,7 +96,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container">
+  <div class="container-fluid px-2 px-md-3">
     <!-- Loading and error states -->
     <div v-if="isLoading" class="alert alert-info">
       {{ $t('upcoming.loading') }}
@@ -112,3 +112,13 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Mobile: reduce container padding and ensure proper horizontal scrolling */
+@media (max-width: 767.98px) {
+  .container-fluid {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+}
+</style>

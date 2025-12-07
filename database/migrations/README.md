@@ -2,6 +2,30 @@
 
 This directory contains SQL migration scripts for updating the database with new tax rates, charges, and price configurations.
 
+## Automatic Migration Execution
+
+**Migrations are automatically executed on application startup.** The backend service runs all pending migration files from this directory in alphabetical order (by filename). Executed migrations are tracked in a `migrations` table to prevent re-execution.
+
+### How It Works
+
+1. On backend startup, the migration runner:
+   - Creates a `migrations` table if it doesn't exist
+   - Scans `database/migrations/` for `.sql` files
+   - Compares against executed migrations
+   - Executes pending migrations in alphabetical order (use date prefixes: `YYYY-MM-DD_description.sql`)
+   - Records each executed migration
+
+2. **Migration files are mounted as a volume** in `docker-compose.yml`, so you can add new migration files without rebuilding the container.
+
+3. **To add a new migration:**
+   - Create a new `.sql` file in this directory with a date prefix (e.g., `2026-01-15_new_viap_rate.sql`)
+   - Restart the backend service: `docker-compose restart backend`
+   - The migration will run automatically on startup
+
+### Manual Execution (Optional)
+
+If you prefer to run migrations manually, see the sections below.
+
 ## How to Add New VIAP and Other Tax Changes
 
 ### Understanding Effective Dates

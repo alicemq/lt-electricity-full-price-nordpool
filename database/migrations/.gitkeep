@@ -1,0 +1,4 @@
+# This directory contains database migration files
+# Migration files should be named: YYYY-MM-DD_description.sql
+# They will be automatically executed on application startup in alphabetical order
+

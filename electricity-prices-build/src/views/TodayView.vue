@@ -79,7 +79,7 @@ function setTomorrow() {
 </script>
 
 <template>
-  <div class="container">
+  <div class="container-fluid px-2 px-md-3">
     <div class="today-page">
       <div class="d-flex gap-2 mb-3">
         <VueDatePicker v-model="date" locale="lt" month-name-format="long" format="yyyy-MM-dd" 
@@ -99,6 +99,14 @@ function setTomorrow() {
 <style scoped>
 .today-page {
   padding: 0;
+}
+
+/* Mobile: reduce container padding and ensure proper horizontal scrolling */
+@media (max-width: 767.98px) {
+  .container-fluid {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
 }
 </style>
 

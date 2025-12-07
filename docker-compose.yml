@@ -34,6 +34,7 @@ services:
       - ./backend:/app
       - /app/node_modules
       - ./database/init:/app/database/init:ro
+      - ./database/migrations:/app/database/migrations:ro
     # Backend is not exposed to the internet - only accessible through frontend proxy
     # ports:
     #   - "3000:3000"
