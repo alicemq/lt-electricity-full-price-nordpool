@@ -6,6 +6,7 @@ import moment from 'moment-timezone';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getDatabaseStats, getSystemHealth, getInitialSyncStatus } from './database.js';
 import v1Router from './v1.js';
 import { startSyncWorker, stopSyncWorker, getSyncStatus } from './syncWorker.js';
+import syncWorker from './syncWorker.js';
 
 dotenv.config();
 
@@ -222,6 +223,44 @@ app.get('/api/sync/initial-status', async (req, res) => {
       success: false,
       error: 'Failed to get initial sync status',
       details: error.message
+    });
+  }
+});
+
+// Legacy sync endpoints (proxied to v1 paths)
+app.get('/api/sync/status', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: getSyncStatus(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get sync status',
+      details: error.message,
+    });
+  }
+});
+
+app.post('/api/sync/trigger', async (req, res) => {
+  try {
+    const { country, daysBack } = req.body || {};
+    if (country) {
+      const records = await syncWorker.triggerManualSync(country, daysBack || 1);
+      return res.json({
+        success: true,
+        message: `Manual sync completed for ${country.toUpperCase()}`,
+        records,
+      });
+    }
+    const result = await syncWorker.triggerCatchUpSync();
+    res.json({ success: true, message: result.message });
+  } catch (error) {
+    res.status(error.message.includes('already running') ? 409 : 500).json({
+      success: false,
+      error: 'Manual sync failed',
+      details: error.message,
     });
   }
 });
