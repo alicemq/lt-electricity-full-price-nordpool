@@ -67,7 +67,7 @@ jobs:
 
   secret-scan:
     runs-on: ubuntu-latest
-    if: env.CI_GITLEAKS_ENABLED != '0'
+    if: ${{ vars.CI_GITLEAKS_ENABLED != '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
