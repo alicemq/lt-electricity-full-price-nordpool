@@ -1,0 +1,51 @@
+name: Feature or idea
+description: New feature, enhancement, or product idea (required before implementation)
+title: "[type:feature] "
+labels:
+  - type:feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Required before implementation. See **AGENTS.md** scope gate.
+        Every PR for this work must reference this issue (`Fixes #N`).
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      description: "As a [role], I want [goal], so that [benefit]."
+      placeholder: "As a ..., I want ..., so that ..."
+    validations:
+      required: true
+  - type: textarea
+    id: dev_story
+    attributes:
+      label: Dev story
+      description: Technical scope, modules/files, acceptance criteria, out of scope.
+      placeholder: |
+        **Scope:** backend/, electricity-prices-build/, …
+        **Acceptance criteria:**
+        - [ ] …
+        **Out of scope:**
+        - …
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source
+      options:
+        - source:human
+        - source:ai
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - priority:p2
+        - priority:p1
+        - priority:p0
+    validations:
+      required: true

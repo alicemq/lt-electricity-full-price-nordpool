@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CI_GITLEAKS_ENABLED: ${{ vars.CI_GITLEAKS_ENABLED || '1' }}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose config -q
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend unit tests
+        working-directory: backend
+        run: npm test
+
+      - name: Install frontend dependencies
+        working-directory: electricity-prices-build
+        run: npm ci
+
+      - name: Frontend build
+        working-directory: electricity-prices-build
+        run: npm run build
+
+      - name: Repo hygiene files
+        run: |
+          test -f AGENTS.md
+          test -f .env.example
+          test -f swagger-ui/openapi.yaml
+          test -f deploy/local.env.example
+          test -f bin/smoke-local.sh
+
+      - name: OpenAPI structure check
+        run: |
+          node -e "
+            const fs = require('fs');
+            const y = fs.readFileSync('swagger-ui/openapi.yaml', 'utf8');
+            if (!y.includes('openapi: 3.')) throw new Error('missing openapi version');
+            if (!y.includes('/health')) throw new Error('missing /health');
+          "
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    if: env.CI_GITLEAKS_ENABLED != '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,52 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+coverage/
+
+# Environment and secrets (never commit live values)
+.env
+.env.*
+!.env.example
+!**/*.env.example
+deploy/local.env
+deploy/local.override.env
+
+# IDE and editor history
+.history/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs and OS
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.DS_Store
+
+# Worktrees and local tooling
+.worktrees/
+
+# DB capture temp files (LFS snapshot path data/db-backup/*.sql.gz is tracked)
+data/db-backup/*.partial
+data/db-backup/*.tmp
+data/db-backup/*.sql.gz.tmp
+
+# Legacy paths (kept for compatibility)
 /electricity-prices
 /index.js
 /vue-project
-/.history
-/backend/node_modules
+
+# Frontend test artifacts
+/cypress/videos/
+/cypress/screenshots/
+*.local
+*.tsbuildinfo
