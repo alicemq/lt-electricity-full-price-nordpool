@@ -3,6 +3,6 @@ contact_links:
   - name: Agent handbook (AGENTS.md)
     url: https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/AGENTS.md
     about: Scope gate, labels, and workflow before coding
-  - name: flows v0.6.2 reference (vendor/flows)
+  - name: flows reference (vendor/flows, tracks main)
     url: https://github.com/alicemq/lt-electricity-full-price-nordpool/tree/main/vendor/flows
-    about: Read-only submodule; revamp checklist and template source
+    about: Read-only submodule on latest flows main; revamp checklist and template source

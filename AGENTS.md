@@ -17,20 +17,22 @@
 
 ## Hybrid flows reference (read-only)
 
-Agent workflow patterns were borrowed from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.2**. Flows is reference material only, not a product dependency.
+Agent workflow patterns were borrowed from [alicemq/flows](https://github.com/alicemq/flows) on **`main` (latest)**. Flows is reference material only, not a product dependency.
 
-- **Pinned tag:** v0.6.2 (record here when intentionally bumping)
-- **Local copy:** git submodule at `vendor/flows` @ v0.6.2 — read handbook and templates there (`vendor/flows/README.md`, `vendor/flows/examples/nordpool-revamp-checklist.md`)
-- **Clone without submodule:** `git clone --depth 1 --branch v0.6.2 https://github.com/alicemq/flows.git ../flows` (one-time; optional)
+- **Tracking policy:** `vendor/flows` submodule follows **`main`** (default branch), not a detached tag
+- **Local copy:** git submodule at `vendor/flows` — read handbook and templates there (`vendor/flows/README.md`, `vendor/flows/examples/nordpool-revamp-checklist.md`)
+- **Refresh to latest:** `git submodule update --remote vendor/flows` (commit the updated gitlink when refreshing intentionally)
+- **Clone without submodule:** `git clone --depth 1 https://github.com/alicemq/flows.git ../flows` (one-time; optional)
 - **Template sync:** run `install.sh` only when intentionally copying templates into Nordpool:
 
 ```bash
 git submodule update --init vendor/flows   # if submodule not checked out
+git submodule update --remote vendor/flows # optional: pull latest main before install
 vendor/flows/install.sh --target . --layout legacy-api-backend \
   --frontend-dir electricity-prices-build --phase ua0 --project-name nordpool
 ```
 
-Do **not** open Nordpool work to maintain or patch `vendor/flows`. Update the submodule pin only when a PO-approved revamp slice needs a newer tagged release.
+Do **not** open Nordpool work to maintain or patch `vendor/flows`. Refresh the submodule when a PO-approved revamp slice needs newer handbook or templates; otherwise read whatever commit is recorded in the parent repo.
 
 Reference checklist: `vendor/flows/examples/nordpool-revamp-checklist.md`. Phase 0/1 (this repo) covers UA0 hygiene and partial UA1/UA2; see GitHub issues #2 (UA0), #3 (secrets), #4 (CI).
 
@@ -38,8 +40,8 @@ Reference checklist: `vendor/flows/examples/nordpool-revamp-checklist.md`. Phase
 
 When reviewing whether to refresh templates before a new revamp slice:
 
-1. **Pin review (optional)** — confirm v0.6.2 still matches needs; bump the pin in this file only when PO approves a template refresh.
-2. **Read local reference** — use `vendor/flows` (submodule) or a tagged release checkout; do not track flows `main`.
+1. **Refresh check (optional)** — run `git submodule update --remote vendor/flows` and review the diff; commit the gitlink when adopting newer templates.
+2. **Read local reference** — use `vendor/flows` (submodule on `main`); upstream handbook lives at [alicemq/flows](https://github.com/alicemq/flows/tree/main).
 3. **Copy-in when needed** — run `vendor/flows/install.sh --layout legacy-api-backend --frontend-dir electricity-prices-build` for the target phase only. Review the diff; commit product-specific fills separately from generic template copies.
 4. **Nordpool gaps only** — debt or missing patterns discovered during adoption MUST be filed in [this repo's issues](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues) with `source:ai`. Do not fork flows conventions silently here.
 5. **Adopter checklist** — walk `vendor/flows/examples/nordpool-revamp-checklist.md` row by row; mark exit criteria in the matching Nordpool issue or PR. Blockers table at the top requires human decisions before UA0 feature work.
@@ -78,7 +80,7 @@ backend/src/v1.js      # v1 price routes (large — split planned UA5)
 electricity-prices-build/src/   # Vue SPA
 swagger-ui/openapi.yaml         # OpenAPI source of truth (UA3 will consolidate duplicates)
 database/init/                  # Schema bootstrap (single source of truth)
-vendor/flows/                   # Read-only flows v0.6.2 reference (submodule; do not patch)
+vendor/flows/                   # Read-only flows reference on main (submodule; do not patch)
 ```
 
 **Do not modify in foundation/revamp phases unless explicitly scoped:**
