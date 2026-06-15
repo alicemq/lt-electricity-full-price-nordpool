@@ -12,6 +12,17 @@ import {
 import { getExpectedMtuRange } from './lib/sync/completeness.js';
 import { shouldSuppressDailySyncForToday } from './lib/sync/suppression.js';
 import { validateCronSchedule } from './lib/admin/cronValidation.js';
+import {
+  buildBackupFetchKey,
+  resetBackupFetchGuard,
+  withBackupFetchGuard,
+} from './lib/prices/backupFetchGuard.js';
+import {
+  isSingleDateRecordCountComplete,
+  needsBackupFetch,
+  parseAllowBackupFlag,
+  resolveBackupFetchPlan,
+} from './lib/prices/backupFetchPolicy.js';
 
 let passed = 0;
 let failed = 0;
@@ -141,6 +152,54 @@ test('validateCronSchedule rejects invalid cron expression', () => {
 test('validateCronSchedule rejects invalid timezone', () => {
   const result = validateCronSchedule('0 2 * * 0', 'Not/AZone');
   assert.equal(result.valid, false);
+});
+
+test('parseAllowBackupFlag accepts explicit truthy values', () => {
+  assert.equal(parseAllowBackupFlag({ allow_backup: '1' }), true);
+  assert.equal(parseAllowBackupFlag({ backup: 'true' }), true);
+  assert.equal(parseAllowBackupFlag({}), false);
+});
+
+test('needsBackupFetch flags empty and incomplete single-day data', () => {
+  assert.equal(needsBackupFetch([], '2024-06-15'), true);
+  assert.equal(needsBackupFetch([{ timestamp: 1 }], '2024-06-15'), true);
+  assert.equal(needsBackupFetch(Array.from({ length: 24 }, (_, i) => ({ timestamp: i })), '2024-06-15'), false);
+});
+
+test('isSingleDateRecordCountComplete handles hourly and quarter-hour MTU', () => {
+  assert.equal(isSingleDateRecordCountComplete(24), true);
+  assert.equal(isSingleDateRecordCountComplete(23), true);
+  assert.equal(isSingleDateRecordCountComplete(10), false);
+  assert.equal(isSingleDateRecordCountComplete(96), true);
+  assert.equal(isSingleDateRecordCountComplete(90), false);
+});
+
+test('resolveBackupFetchPlan skips backup during release window unless forced', () => {
+  const skipped = resolveBackupFetchPlan({
+    needsLiveFetch: true,
+    inReleaseWindow: true,
+    allowBackup: false,
+  });
+  assert.equal(skipped.attempt, false);
+  assert.equal(skipped.reason, 'release_window');
+
+  const forced = resolveBackupFetchPlan({
+    needsLiveFetch: true,
+    inReleaseWindow: true,
+    allowBackup: true,
+  });
+  assert.equal(forced.attempt, true);
+  assert.equal(forced.reason, 'explicit_flag');
+});
+
+await testAsync('withBackupFetchGuard rate-limits duplicate keys', async () => {
+  resetBackupFetchGuard();
+  const key = buildBackupFetchKey({ country: 'lt', date: '2024-06-15' });
+  const first = await withBackupFetchGuard(key, async () => 'ok');
+  assert.equal(first.status, 'fetched');
+  const second = await withBackupFetchGuard(key, async () => 'again');
+  assert.equal(second.status, 'rate_limited');
+  resetBackupFetchGuard();
 });
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);
