@@ -41,8 +41,27 @@ if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
   echo "==> GET /health OK"
   curl -sf "${API_URL}/health" | head -c 200 || true
   echo ""
+
+  echo "==> GET /api/v1/sync/status OK"
+  curl -sf "${API_URL}/api/v1/sync/status" | head -c 200 || true
+  echo ""
+
+  echo "==> legacy /api/sync/status includes Deprecation header"
+  legacy_headers="$(curl -sI "${API_URL}/api/sync/status")"
+  echo "${legacy_headers}" | grep -qi '^Deprecation:' || { echo "missing Deprecation header on legacy path"; exit 1; }
+  echo "${legacy_headers}" | grep -qi 'Link:.*successor-version' || { echo "missing Link successor-version on legacy path"; exit 1; }
 else
   echo "SKIP: API not running at ${API_URL} (start with ./scripts/dev.sh or docker compose up)"
+fi
+
+if command -v node >/dev/null 2>&1 && [[ -f bin/openapi-json-from-yaml.js ]]; then
+  echo "==> OpenAPI JSON sync check"
+  if [[ -d backend/node_modules ]]; then
+    node bin/openapi-json-from-yaml.js --check
+  else
+    npm ci --prefix backend >/dev/null
+    node bin/openapi-json-from-yaml.js --check
+  fi
 fi
 
 echo "smoke-local: OK"
