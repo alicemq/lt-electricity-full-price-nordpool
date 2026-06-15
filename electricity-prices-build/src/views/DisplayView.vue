@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import moment from 'moment-timezone';
 import PriceTable from '../components/PriceTable.vue';
 import DisplayChartPanel from '../components/display/DisplayChartPanel.vue';
-import { decodeLayout } from '../lib/layoutCodec.js';
+import { decodeLayout, buildShareUrl } from '../lib/layoutCodec.js';
 import { fetchPrices, fetchUpcomingPrices, onPricesUpdated, runSmartSync } from '../services/priceService';
 import { logAllPriceBreakdowns } from '../services/priceCalculationService';
 
@@ -16,8 +16,10 @@ const priceData = ref([]);
 const allPrices = ref([]);
 const isLoading = ref(true);
 const loadError = ref(null);
+const copyStatus = ref(null);
 
 let refreshTimeout = null;
+let copyStatusTimeout = null;
 let unsubscribePrices = null;
 
 const isKiosk = computed(() => route.meta.kiosk === true || route.query.kiosk === '1');
@@ -120,8 +122,26 @@ onMounted(() => {
   }
 });
 
+async function copyShareLink() {
+  if (!layoutConfig.value) return;
+
+  const url = buildShareUrl(layoutConfig.value, route.path.startsWith('/tv') ? '/tv' : '/display');
+  try {
+    await navigator.clipboard.writeText(url);
+    copyStatus.value = 'copied';
+  } catch {
+    copyStatus.value = 'failed';
+  }
+
+  if (copyStatusTimeout) clearTimeout(copyStatusTimeout);
+  copyStatusTimeout = setTimeout(() => {
+    copyStatus.value = null;
+  }, 2500);
+}
+
 onUnmounted(() => {
   if (refreshTimeout) clearTimeout(refreshTimeout);
+  if (copyStatusTimeout) clearTimeout(copyStatusTimeout);
   if (unsubscribePrices) unsubscribePrices();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
@@ -149,6 +169,23 @@ watch(
     </div>
 
     <template v-else>
+      <div class="display-view__toolbar">
+        <button
+          type="button"
+          class="display-view__copy"
+          :aria-label="$t('display.copyLink')"
+          @click="copyShareLink"
+        >
+          {{ copyStatus === 'copied' ? $t('display.copied') : $t('display.copyLink') }}
+        </button>
+        <span
+          v-if="copyStatus === 'failed'"
+          class="display-view__copy-error"
+          role="status"
+        >
+          {{ $t('display.copyFailed') }}
+        </span>
+      </div>
       <div v-if="isLoading" class="display-view__message">
         {{ $t('display.loading') }}
       </div>
@@ -212,6 +249,35 @@ watch(
 .display-view__title {
   font-size: clamp(2rem, 4vw, 3.5rem);
   margin-bottom: 1rem;
+}
+
+.display-view__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.display-view__copy {
+  font-size: clamp(0.875rem, 1.5vw, 1.125rem);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.display-view__copy:hover,
+.display-view__copy:focus-visible {
+  opacity: 1;
+}
+
+.display-view__copy-error {
+  font-size: 0.875rem;
+  color: #f87171;
 }
 
 .display-view__panel {

@@ -5,6 +5,8 @@ import {
   buildDisplayUrl,
   defaultLayoutConfig,
   normalizeLayoutConfig,
+  exportLayoutJson,
+  importLayoutJson,
 } from '../src/lib/layoutCodec.js';
 
 describe('layoutCodec', () => {
@@ -70,5 +72,21 @@ describe('layoutCodec', () => {
       theme: 'dark',
       tz: 'Europe/Vilnius',
     });
+  });
+
+  it('exports and imports layout JSON', () => {
+    const config = defaultLayoutConfig();
+    const json = exportLayoutJson(config);
+    const imported = importLayoutJson(json);
+    expect(imported.ok).toBe(true);
+    if (imported.ok) {
+      expect(imported.config).toEqual(config);
+    }
+  });
+
+  it('rejects invalid layout JSON import', () => {
+    expect(importLayoutJson('')).toEqual({ ok: false, error: 'missing' });
+    expect(importLayoutJson('{not json')).toEqual({ ok: false, error: 'invalid' });
+    expect(importLayoutJson('{"v":2,"panel":"table"}')).toEqual({ ok: false, error: 'invalid' });
   });
 });
