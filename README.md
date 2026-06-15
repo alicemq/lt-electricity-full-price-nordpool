@@ -1,5 +1,7 @@
 # Electricity Prices NordPool
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](./LICENSE)
+
 A modern, containerized electricity price monitoring system for Baltic countries (Lithuania, Estonia, Latvia, Finland) with automated data synchronization from the Elering NordPool API.
 
 ## 🚀 **Quick Start**
@@ -399,6 +401,17 @@ curl http://localhost:3000/api/sync/status
 # Restart services
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml restart [service-name]
 ```
+
+## 📜 **License**
+
+Copyright (c) Alice MQ (alicemq). SPDX-License-Identifier: [AGPL-3.0-only](./LICENSE).
+
+This project is dual-licensed:
+
+- **Open source:** [GNU Affero General Public License v3.0](./LICENSE)
+- **Commercial:** [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md) for proprietary or closed-source use
+
+Contributions require DCO sign-off; see [CONTRIBUTING.md](./CONTRIBUTING.md). Citation metadata: [CITATION.cff](./CITATION.cff).
 
 ## 📄 **Documentation**
 

@@ -65,6 +65,18 @@ database/migrations/            # Numbered SQL migrations
 
 OpenAPI: `swagger-ui/openapi.yaml`. HTTP contract changes MUST update OpenAPI in the same PR (UA3+).
 
+## License policy
+
+- **Default license:** [AGPL-3.0-only](./LICENSE) (SPDX). Copyright (c) Alice MQ (alicemq).
+- **Commercial use:** Closed-source or AGPL-incompatible deployment requires a separate license; see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md).
+- **Contributions:** [CONTRIBUTING.md](./CONTRIBUTING.md) requires DCO sign-off (`git commit -s`).
+- **Citation:** [CITATION.cff](./CITATION.cff) for software citation metadata.
+- **Staleness:** `package.json` and OpenAPI may still list MIT until a dedicated follow-up issue aligns them.
+
+## Gap reporting (agents)
+
+When you find a defect, missing test, doc drift, or scope gap during work and you are **not** fixing it in the current PR, you MUST open a GitHub issue (label `source:ai`, appropriate `type:*`) before ending the session. Link the issue from your PR or handoff notes.
+
 ## Secrets policy
 
 - **Never commit** `.env`, passwords, or API keys. Use `.env.example` and `deploy/local.env.example` with `CHANGE_ME` placeholders.
