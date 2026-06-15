@@ -26,6 +26,7 @@ import {
 import { hashManageToken, createManageToken } from './push/tokens.js';
 import { getVapidConfig, isPushConfigured } from './push/vapid.js';
 import { buildHealthResponse } from './lib/healthResponse.js';
+import { isReady } from './lib/readyChecks.js';
 
 let passed = 0;
 let failed = 0;
@@ -254,6 +255,12 @@ test('buildHealthResponse guards missing nested health fields', () => {
   assert.equal(response.success, true);
   assert.deepEqual(response.dataFreshness, []);
   assert.ok(response.issues.includes('Database connection failed'));
+});
+
+test('isReady requires all checks true', () => {
+  assert.equal(isReady({ postgres: true, price_data_fresh: true }), true);
+  assert.equal(isReady({ postgres: true, price_data_fresh: false }), false);
+  assert.equal(isReady({ postgres: false, price_data_fresh: true }), false);
 });
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);
