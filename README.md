@@ -424,6 +424,8 @@ Contributions require DCO sign-off; see [CONTRIBUTING.md](./CONTRIBUTING.md). Ci
 
 ## 📄 **Documentation**
 
+- [Coolify deployment](./COOLIFY_DEPLOYMENT.md) — production deploy guide
+- [Coolify password rotation](./docs/ops/coolify-password-rotation.md) — operator runbook (#34)
 - [Project Planning](./documentation/project_planning.md) - Detailed project documentation
 - [API Documentation](./electricity-prices-build/public/docs/swagger.yaml) - Swagger API specs
 - [Interactive API Docs](./api/) - Swagger UI interface

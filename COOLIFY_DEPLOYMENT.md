@@ -132,6 +132,7 @@ See [docs/ops/push-admin.md](docs/ops/push-admin.md) for operator curl examples 
 **Important Notes**:
 - **Replace `your_secure_password_here`** with a strong, unique password
 - Use the **same password** for both `POSTGRES_PASSWORD` and in `DATABASE_URL`
+- For production password rotation (issue #34), see [docs/ops/coolify-password-rotation.md](docs/ops/coolify-password-rotation.md)
 - Make sure `FRONTEND_PORT` matches the port in `FRONTEND_URL`
 - The optimized `docker-compose.coolify.yml` has **no hardcoded passwords** - all sensitive values must be set via environment variables
 
@@ -287,7 +288,7 @@ Use the default `docker-compose.yml` with:
 
 ## Security Considerations
 
-1. **Database Password**: Use a strong, unique password
+1. **Database Password**: Use a strong, unique password. Rotate production credentials per [docs/ops/coolify-password-rotation.md](docs/ops/coolify-password-rotation.md) (#34).
 2. **Environment Variables**: Never commit sensitive data to Git
 3. **Network**: Services should only be accessible internally (except frontend)
 4. **SSL/TLS**: If Coolify supports it, enable HTTPS for production
