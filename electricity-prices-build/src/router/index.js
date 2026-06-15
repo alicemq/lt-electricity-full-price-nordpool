@@ -113,6 +113,38 @@ const router = createRouter({
           en: 'Learn more about the electricity prices application, settings, and how to use the system effectively.'
         }
       }
+    },
+    {
+      path: '/display',
+      name: 'display',
+      component: () => import('../views/DisplayView.vue'),
+      meta: {
+        kiosk: true,
+        title: {
+          lt: 'Ekrano rodinys',
+          en: 'Display Mode'
+        },
+        description: {
+          lt: 'Bendrinamas TV arba kiosk rodinys su užkoduota išdėstymo nuoroda.',
+          en: 'Shareable TV or kiosk view with an encoded layout link.'
+        }
+      }
+    },
+    {
+      path: '/tv',
+      name: 'tv',
+      component: () => import('../views/DisplayView.vue'),
+      meta: {
+        kiosk: true,
+        title: {
+          lt: 'TV rodinys',
+          en: 'TV Display'
+        },
+        description: {
+          lt: 'Pilno ekrano TV rodinys su užkoduota išdėstymo nuoroda.',
+          en: 'Fullscreen TV display with an encoded layout link.'
+        }
+      }
     }
   ]
 })
