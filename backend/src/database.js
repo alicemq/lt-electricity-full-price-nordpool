@@ -734,6 +734,7 @@ export async function markInitialSyncComplete(endDate, recordsCount) {
     `, [recordsCount, endDate]);
     
     console.log(`Initial sync completion recorded: ${recordsCount} records to ${endDate} at ${completionTime}`);
+    console.log('[Initial Sync] Capture portable DB snapshot: ./bin/capture-db-lfs.sh');
   } catch (err) {
     console.error('Error recording initial sync completion:', err);
   }

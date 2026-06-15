@@ -1,6 +1,7 @@
 import express from 'express';
 import moment from 'moment-timezone';
 import syncWorker from './syncWorker.js';
+import { isInReleaseWindow } from './lib/sync/releaseWindow.js';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getLatestTimestamp, logSync, getAllEarliestTimestamps, getInitialSyncStatus, getDatabaseStats, getSystemHealth, getAllCountrySyncStatus } from './database.js';
 import pool from './database.js';
 
@@ -276,6 +277,10 @@ router.get('/nps/prices', async (req, res) => {
     // Check if we have sufficient data for the requested date(s)
     // For single date queries, check if we have sufficient data for that date
     // For date range queries, check if we're missing significant portions
+    // BACKUP PATH (issue #11): syncWorker is the primary ingestion path during the
+    // Nordpool release window. On-demand Elering fetch below is a fallback when DB
+    // data is missing or incomplete outside that window.
+    let dataSource = 'db';
     let needsLiveFetch = false;
     if (rawData.length === 0) {
       needsLiveFetch = true;
@@ -300,9 +305,21 @@ router.get('/nps/prices', async (req, res) => {
       }
     }
     
-    // If no data found or insufficient data, try on-demand fetch from Elering API
+    // If no data found or insufficient data, try backup fetch from Elering API
     if (needsLiveFetch) {
-      console.log(`[On-Demand Fetch] No or insufficient data in DB for ${date || `${start} to ${end}`} (${country || 'all'}), attempting live fetch...`);
+      if (isInReleaseWindow()) {
+        console.log(`[Backup Fetch] Skipped during release window — sync worker owns ingestion for ${date || `${start} to ${end}`}`);
+        if (rawData.length === 0) {
+          return res.status(404).json({
+            success: false,
+            error: 'No price data found for the specified date range',
+            code: 'NO_DATA_FOUND',
+            meta: { dataSource: 'partial', releaseWindowActive: true }
+          });
+        }
+        dataSource = 'partial';
+      } else {
+      console.log(`[Backup Fetch] No or insufficient data in DB for ${date || `${start} to ${end}`} (${country || 'all'}), attempting live fetch...`);
       
       try {
         // Determine date range for fetch
@@ -372,15 +389,21 @@ router.get('/nps/prices', async (req, res) => {
           });
         }
         
-        console.log(`[On-Demand Fetch] Successfully fetched and stored ${rawData.length} records`);
+        console.log(`[Backup Fetch] Successfully fetched and stored ${rawData.length} records`);
+        dataSource = 'vendor_backup';
       } catch (error) {
-        console.error(`[On-Demand Fetch] Error fetching data from Elering API:`, error.message);
+        console.error(`[Backup Fetch] Error fetching data from Elering API:`, error.message);
+        if (rawData.length > 0) {
+          dataSource = 'partial';
+        } else {
         return res.status(500).json({ 
           success: false,
           error: 'Failed to fetch data from Elering API',
           code: 'FETCH_ERROR',
           details: error.message
         });
+        }
+      }
       }
     }
     
@@ -414,12 +437,14 @@ router.get('/nps/prices', async (req, res) => {
     res.json({
       success: true,
       data,
-      meta: {
+        meta: {
         date: date || `${start} to ${end}`,
         country: requestedAll ? 'all' : country,
         count: rawData.length,
         timezone: 'Europe/Vilnius',
-        intervalSeconds
+        intervalSeconds,
+        dataSource,
+        releaseWindowActive: isInReleaseWindow()
       }
     });
   } catch (error) {
@@ -625,8 +650,56 @@ router.get('/configurations', async (req, res) => {
   }
 });
 
+// Sync worker status and manual trigger
+router.get('/sync/status', async (req, res) => {
+  try {
+    const status = syncWorker.getStatus();
+    res.json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    console.error('[API] Error getting sync status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get sync status',
+      details: error.message,
+    });
+  }
+});
+
+router.post('/sync/trigger', async (req, res) => {
+  try {
+    const { country, daysBack } = req.body || {};
+
+    if (country) {
+      const records = await syncWorker.triggerManualSync(country, daysBack || 1);
+      return res.json({
+        success: true,
+        message: `Manual sync completed for ${country.toUpperCase()}`,
+        records,
+        country,
+        daysBack: daysBack || 1,
+      });
+    }
+
+    const result = await syncWorker.triggerCatchUpSync();
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('[API] Manual sync trigger error:', error);
+    res.status(error.message.includes('already running') ? 409 : 500).json({
+      success: false,
+      error: 'Manual sync failed',
+      details: error.message,
+    });
+  }
+});
+
 // Enhanced sync endpoints
-router.post('/api/v1/sync/historical', async (req, res) => {
+router.post('/sync/historical', async (req, res) => {
   try {
     const { startDate, endDate, country = 'lt' } = req.body;
     
@@ -654,7 +727,7 @@ router.post('/api/v1/sync/historical', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/year', async (req, res) => {
+router.post('/sync/year', async (req, res) => {
   try {
     const { year, country = 'lt' } = req.body;
     
@@ -683,7 +756,7 @@ router.post('/api/v1/sync/year', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/years', async (req, res) => {
+router.post('/sync/years', async (req, res) => {
   try {
     const { startYear, endYear, country = 'lt' } = req.body;
     
@@ -711,7 +784,7 @@ router.post('/api/v1/sync/years', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/all-historical', async (req, res) => {
+router.post('/sync/all-historical', async (req, res) => {
   try {
     const { country = 'lt' } = req.body;
     
@@ -734,7 +807,7 @@ router.post('/api/v1/sync/all-historical', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/efficient', async (req, res) => {
+router.post('/sync/efficient', async (req, res) => {
   try {
     console.log('[API] Efficient sync requested for all countries');
     const records = await syncWorker.syncAllCountriesEfficient();
@@ -754,7 +827,7 @@ router.post('/api/v1/sync/efficient', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/all-countries-historical', async (req, res) => {
+router.post('/sync/all-countries-historical', async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
     
@@ -784,7 +857,7 @@ router.post('/api/v1/sync/all-countries-historical', async (req, res) => {
   }
 });
 
-router.post('/api/v1/sync/all-countries-all-historical', async (req, res) => {
+router.post('/sync/all-countries-all-historical', async (req, res) => {
   try {
     console.log(`[API] All countries all historical sync requested (2012-07-01 to today)`);
     const records = await syncWorker.syncAllCountriesHistorical('2012-07-01', moment().format('YYYY-MM-DD'));
@@ -914,11 +987,7 @@ router.get('/health', async (req, res) => {
       dataFreshness: health.sync.dataFreshness
     };
     
-    // Check if we're in the active period for daily sync
-    const now = moment().tz('UTC');
-    const activeStart = moment().tz('UTC').set({ hour: 12, minute: 45, second: 0, millisecond: 0 });
-    const activeEnd = moment().tz('UTC').set({ hour: 15, minute: 55, second: 0, millisecond: 0 });
-    const isInActivePeriod = now.isBetween(activeStart, activeEnd, null, '[]'); // inclusive
+    const isInActivePeriod = isInReleaseWindow();
     
     // Add overall health status
     const isHealthy = health.database.connected && 

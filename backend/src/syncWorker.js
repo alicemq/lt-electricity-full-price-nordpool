@@ -1,6 +1,16 @@
 import cron from 'node-cron';
 import moment from 'moment-timezone';
 import EleringAPI from './elering-api.js';
+import { isDateComplete as checkDateComplete } from './lib/sync/completeness.js';
+import {
+  isInReleaseWindow,
+  nowInReleaseTz,
+} from './lib/sync/releaseWindow.js';
+import { DailySyncScheduler } from './lib/sync/schedule.js';
+import {
+  runStartupSyncCheck,
+} from './lib/sync/syncOrchestrator.js';
+import { shouldSuppressDailySyncForToday as shouldSuppressDailySync } from './lib/sync/suppression.js';
 import { 
   testConnection, 
   getLatestTimestamp, 
@@ -42,6 +52,7 @@ class SyncWorker {
     this.dailySyncSuppressedDate = null; // Track which date has suppressed daily sync
     this.dailySyncWatchdogInterval = null; // Watchdog to ensure sync is scheduled
     this.dailySyncFallbackCron = null; // Fallback cron job as safety net
+    this.dailyScheduler = new DailySyncScheduler(this);
   }
 
   // Start the worker
@@ -367,34 +378,8 @@ class SyncWorker {
     }
   }
 
-  // Check startup sync need
   async checkStartupSync() {
-    console.log('[Startup Sync] Checking initial sync status...');
-    
-    // First sanity check: If DB doesn't say initial sync is complete, run initial sync
-    const initialSyncStatus = await getInitialSyncStatus();
-    if (initialSyncStatus.isComplete) {
-      console.log(`[Startup Sync] Initial sync already completed to ${initialSyncStatus.completedDate} (${initialSyncStatus.recordsCount} records)`);
-      
-      // Check country sync status and sync from last_sync_ok_date
-      console.log('[Startup Sync] Checking country sync status for wake-up recovery...');
-      await this.checkAndSyncFromLastSyncOk();
-      
-      return;
-    }
-    
-    // Initial sync not complete - run full initial sync with chunk tracking
-    console.log('[Startup Sync] Initial sync not complete, running full initial sync with chunk tracking...');
-    
-    try {
-      const totalRecords = await this.runInitialSyncWithChunks();
-      console.log(`[Startup Sync] Initial sync completed successfully: ${totalRecords} records`);
-      
-      // After initial sync, initialize country sync status
-      await this.initializeCountrySyncStatuses();
-    } catch (error) {
-      console.error('[Startup Sync] Error during initial sync:', error.message);
-    }
+    await runStartupSyncCheck(this);
   }
 
   // Update sync status for all countries based on latest complete date
@@ -844,154 +829,12 @@ class SyncWorker {
     }
   }
 
-  // Check if a specific date is complete (has at least 22 records for all countries)
   async isDateComplete(date) {
-    try {
-      const startOfDay = moment(date).tz('Europe/Vilnius').startOf('day').unix();
-      const endOfDay = moment(date).tz('Europe/Vilnius').endOf('day').unix();
-      
-      // First, get record count to help determine interval
-      const countResult = await pool.query(`
-        SELECT COUNT(*) as total_count
-        FROM price_data 
-        WHERE timestamp BETWEEN $1 AND $2
-        LIMIT 1
-      `, [startOfDay, endOfDay]);
-      
-      const totalCount = countResult.rows[0] ? parseInt(countResult.rows[0].total_count, 10) : 0;
-      
-      // Determine the interval (MTU) for this date
-      // Use record count as primary indicator: 90+ records = 15-min MTU, <30 = 60-min MTU
-      let expectedRecordsMin = 24; // Default to 60-minute MTU (24 hours)
-      let expectedRecordsMax = 24;
-      
-      // If we have a high record count (>= 90), it's definitely 15-minute MTU
-      if (totalCount >= 90) {
-        // 15-minute MTU
-        // Standard day: 96 records (24 hours * 4)
-        // DST spring forward (lose 1 hour): 92 records (23 hours * 4)
-        // DST fall back (gain 1 hour): 100 records (25 hours * 4)
-        expectedRecordsMin = 92; // Minimum for DST spring forward
-        expectedRecordsMax = 100; // Maximum for DST fall back
-      } else if (totalCount > 0) {
-        // For lower counts, check the actual interval between timestamps
-        const intervalResult = await pool.query(`
-          SELECT timestamp
-          FROM price_data 
-          WHERE timestamp BETWEEN $1 AND $2
-          ORDER BY timestamp
-          LIMIT 10
-        `, [startOfDay, endOfDay]);
-        
-        if (intervalResult.rows.length >= 2) {
-          // Check multiple intervals to find the most common one
-          const intervals = [];
-          for (let i = 1; i < intervalResult.rows.length; i++) {
-            const diff = intervalResult.rows[i].timestamp - intervalResult.rows[i-1].timestamp;
-            if (diff > 0) {
-              intervals.push(diff);
-            }
-          }
-          
-          // Find the most common interval
-          const mostCommonInterval = intervals.length > 0 ? intervals[0] : null;
-          
-          if (mostCommonInterval === 900) {
-            // 15-minute MTU
-            expectedRecordsMin = 92;
-            expectedRecordsMax = 100;
-          } else if (mostCommonInterval === 3600) {
-            // 60-minute MTU
-            expectedRecordsMin = 23;
-            expectedRecordsMax = 25;
-          }
-          // If interval is neither 900 nor 3600, keep default (24-24 for 60-min)
-        }
-      }
-      
-      const result = await pool.query(`
-        SELECT country, COUNT(*) as record_count
-        FROM price_data 
-        WHERE timestamp BETWEEN $1 AND $2
-        GROUP BY country
-        ORDER BY country
-      `, [startOfDay, endOfDay]);
-      
-      const countries = ['lt', 'ee', 'lv', 'fi'];
-      const countryCounts = {};
-      
-      // Initialize counts for all countries
-      countries.forEach(country => {
-        countryCounts[country] = 0;
-      });
-      
-      // Update with actual counts from database
-      result.rows.forEach(row => {
-        countryCounts[row.country] = parseInt(row.record_count, 10);
-      });
-      
-      // Check if all countries have records within the expected range (accounting for DST)
-      // A day is complete if all countries have at least the minimum expected records
-      // and no country has significantly more than the maximum (indicating data from next day)
-      const isComplete = countries.every(country => {
-        const count = countryCounts[country];
-        return count >= expectedRecordsMin && count <= expectedRecordsMax;
-      });
-      
-      console.log(`[Date Complete Check] ${date}: ${JSON.stringify(countryCounts)} (expected: ${expectedRecordsMin}-${expectedRecordsMax}) - Complete: ${isComplete}`);
-      
-      return {
-        isComplete,
-        countryCounts,
-        date,
-        expectedRecordsMin,
-        expectedRecordsMax
-      };
-    } catch (error) {
-      console.error(`[Date Complete Check] Error checking completeness for ${date}:`, error.message);
-      return {
-        isComplete: false,
-        countryCounts: {},
-        date,
-        error: error.message
-      };
-    }
+    return checkDateComplete(date, pool);
   }
 
-  // Check if we should suppress daily sync for today
   async shouldSuppressDailySyncForToday() {
-    const now = moment().tz('Europe/Vilnius');
-    const today = now.format('YYYY-MM-DD');
-    
-    // If we already suppressed for today, check if it's still valid
-    if (this.dailySyncSuppressedDate === today) {
-      // Verify today is still complete
-      const todayStatus = await this.isDateComplete(today);
-      if (todayStatus.isComplete) {
-        return true; // Still complete, keep suppressed
-      } else {
-        // No longer complete, clear suppression
-        console.log(`[Daily Sync] Date ${today} is no longer complete, clearing suppression`);
-        this.dailySyncSuppressedDate = null;
-        return false;
-      }
-    }
-    
-    // Check if today is complete
-    const todayStatus = await this.isDateComplete(today);
-    if (todayStatus.isComplete) {
-      console.log(`[Daily Sync] Today (${today}) is complete, stopping dynamic sync checks`);
-      this.dailySyncSuppressedDate = today;
-      // Stop scheduling if sync is complete
-      if (this.dailySyncTimeout) {
-        clearTimeout(this.dailySyncTimeout);
-        this.dailySyncTimeout = null;
-        this.dailySyncNextRun = null;
-      }
-      return true;
-    }
-    
-    return false;
+    return shouldSuppressDailySync(this);
   }
 
   // Check if recent data needs syncing based on per-day completion (daily sync logic)
@@ -1012,11 +855,8 @@ class SyncWorker {
       console.log(`[Daily Sync] Clearing suppression for previous day: ${this.dailySyncSuppressedDate}`);
       this.dailySyncSuppressedDate = null;
       // Resume scheduling if we're in active period
-      const nowUTC = moment().tz('UTC');
-      const activeStart = nowUTC.clone().hour(12).minute(45).second(0).millisecond(0);
-      const activeEnd = nowUTC.clone().hour(15).minute(55).second(0).millisecond(0);
-      if (nowUTC.isBetween(activeStart, activeEnd, null, '[]')) {
-        this.scheduleNextCheckIn5Minutes();
+      if (isInReleaseWindow()) {
+        this.dailyScheduler.scheduleNextCheckIn5Minutes();
       }
     }
     
@@ -1102,12 +942,10 @@ class SyncWorker {
         await this.checkAndSyncFromLastSyncOk();
         console.log('[Daily Sync] Sync completed');
         
-        // After successful sync, check if today is now complete and suppress if so
-        const todayStatusAfterSync = await this.isDateComplete(today);
-        if (todayStatusAfterSync.isComplete) {
-          console.log(`[Daily Sync] Today (${today}) is now complete after sync, suppressing remaining cron jobs for today`);
-          this.dailySyncSuppressedDate = today;
-          this.suppressDailySyncJobs();
+        // After successful sync, suppress only when both today and tomorrow are complete
+        if (await this.shouldSuppressDailySyncForToday()) {
+          console.log(`[Daily Sync] Today (${today}) and tomorrow are complete after sync, suppressing remaining cron jobs for today`);
+          this.dailyScheduler.suppressDailySyncJobs();
         }
       } catch (error) {
         console.error('[Daily Sync] Error during sync:', error.message);
@@ -1115,38 +953,36 @@ class SyncWorker {
     } else {
       console.log(`[Daily Sync] All dates are complete, no sync needed.`);
       
-      // If today is complete, suppress remaining cron jobs
-      const todayStatus = await this.isDateComplete(today);
-      if (todayStatus.isComplete) {
-        console.log(`[Daily Sync] Today (${today}) is complete, suppressing remaining cron jobs for today`);
-        this.dailySyncSuppressedDate = today;
-        this.suppressDailySyncJobs();
+      // Suppress only when both today and tomorrow are complete
+      if (await this.shouldSuppressDailySyncForToday()) {
+        console.log(`[Daily Sync] Today (${today}) and tomorrow are complete, suppressing remaining cron jobs for today`);
+        this.dailyScheduler.suppressDailySyncJobs();
       }
     }
   }
   
-  // Suppress daily sync jobs for the current day
   suppressDailySyncJobs() {
-    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
-      this.dailySyncJobs.forEach(job => {
-        if (job && job.stop) {
-          job.stop();
-        }
-      });
-      console.log(`[Daily Sync] Suppressed ${this.dailySyncJobs.length} daily sync cron jobs`);
-    }
+    this.dailyScheduler.suppressDailySyncJobs();
   }
-  
-  // Resume daily sync jobs (for next day)
+
   resumeDailySyncJobs() {
-    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
-      this.dailySyncJobs.forEach(job => {
-        if (job && job.start) {
-          job.start();
-        }
-      });
-      console.log(`[Daily Sync] Resumed ${this.dailySyncJobs.length} daily sync cron jobs`);
-    }
+    this.dailyScheduler.resumeDailySyncJobs();
+  }
+
+  scheduleDailySync() {
+    this.dailyScheduler.scheduleDailySync();
+  }
+
+  scheduleNextDailySyncCheck() {
+    this.dailyScheduler.scheduleNextDailySyncCheck();
+  }
+
+  scheduleNextCheckIn5Minutes() {
+    this.dailyScheduler.scheduleNextCheckIn5Minutes();
+  }
+
+  async runDailySyncCheck() {
+    return this.dailyScheduler.runDailySyncCheck();
   }
 
   // Simple sync from last available -1 day to today +2 days
@@ -1281,337 +1117,6 @@ class SyncWorker {
     } catch (error) {
       console.error('Error getting last sync time:', error);
       return null;
-    }
-  }
-
-  // Schedule daily sync using dynamic setTimeout (every 5 minutes from 12:45 to 15:55 CET)
-  // Nord Pool publishes prices at 12:45 CET
-  scheduleDailySync() {
-    // Clear any existing timeout
-    if (this.dailySyncTimeout) {
-      clearTimeout(this.dailySyncTimeout);
-      this.dailySyncTimeout = null;
-    }
-
-    // Start the recursive scheduling
-    this.scheduleNextDailySyncCheck();
-    
-    // Start watchdog to ensure sync is scheduled
-    this.startDailySyncWatchdog();
-    
-    // Start fallback cron job as safety net (runs every 15 minutes during active period)
-    this.startDailySyncFallback();
-    
-    // Check for missed jobs on startup and run if needed
-    this.checkForMissedDailySync();
-  }
-
-  // Watchdog: Check every 10 minutes if daily sync should be running but isn't scheduled
-  startDailySyncWatchdog() {
-    if (this.dailySyncWatchdogInterval) {
-      clearInterval(this.dailySyncWatchdogInterval);
-    }
-
-    this.dailySyncWatchdogInterval = setInterval(() => {
-      this.checkDailySyncWatchdog();
-    }, 10 * 60 * 1000); // Every 10 minutes
-
-    console.log('[Daily Sync] Watchdog started (checks every 10 minutes)');
-  }
-
-  // Watchdog check: Verify sync is scheduled when it should be
-  async checkDailySyncWatchdog() {
-    const startTime = Date.now();
-    try {
-      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
-      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-      const isInActivePeriod = nowCET.isBetween(activeStart, activeEnd, null, '[]');
-      let actionTaken = null;
-
-      // If we're in active period but no timeout is scheduled, reschedule
-      if (isInActivePeriod && !this.dailySyncTimeout) {
-        console.warn('[Daily Sync Watchdog] ⚠️  In active period but no sync scheduled! Rescheduling...');
-        this.scheduleNextDailySyncCheck();
-        actionTaken = 'Rescheduled - no sync was scheduled';
-        const duration = Date.now() - startTime;
-        await logScheduledJob('Watchdog', 'success', actionTaken, duration);
-        return;
-      }
-
-      // If we're in active period and timeout exists, verify it's still valid
-      if (isInActivePeriod && this.dailySyncTimeout && this.dailySyncNextRun) {
-        const nextRun = moment(this.dailySyncNextRun);
-        const timeUntilNext = nextRun.diff(nowCET, 'minutes');
-        
-        // If next run is more than 10 minutes away, something might be wrong
-        if (timeUntilNext > 10) {
-          console.warn(`[Daily Sync Watchdog] ⚠️  Next run is ${timeUntilNext} minutes away, might be stuck. Rescheduling...`);
-          if (this.dailySyncTimeout) {
-            clearTimeout(this.dailySyncTimeout);
-            this.dailySyncTimeout = null;
-          }
-          this.scheduleNextCheckIn5Minutes();
-          actionTaken = `Rescheduled - next run was ${timeUntilNext} minutes away`;
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
-          return;
-        }
-
-        // If next run is in the past, reschedule
-        const nowUTC = moment().tz('UTC');
-        if (nextRun.isBefore(nowUTC)) {
-          console.warn('[Daily Sync Watchdog] ⚠️  Next run time is in the past! Rescheduling...');
-          if (this.dailySyncTimeout) {
-            clearTimeout(this.dailySyncTimeout);
-            this.dailySyncTimeout = null;
-          }
-          this.scheduleNextCheckIn5Minutes();
-          actionTaken = 'Rescheduled - next run was in the past';
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
-          return;
-        }
-      }
-
-      // Check if last sync check was too long ago (more than 15 minutes during active period)
-      if (isInActivePeriod && this.dailySyncLastCheck) {
-        const lastCheck = moment(this.dailySyncLastCheck);
-        const nowVilnius = moment().tz('Europe/Vilnius');
-        const minutesSinceLastCheck = nowVilnius.diff(lastCheck, 'minutes');
-        
-        if (minutesSinceLastCheck > 15) {
-          console.warn(`[Daily Sync Watchdog] ⚠️  Last check was ${minutesSinceLastCheck} minutes ago! Forcing check...`);
-          // Force a check now
-          await this.runDailySyncCheck();
-          actionTaken = `Forced check - last check was ${minutesSinceLastCheck} minutes ago`;
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
-          return;
-        }
-      }
-
-      // If we're in active period but suppressed, verify suppression is still valid
-      if (isInActivePeriod && this.dailySyncSuppressedDate) {
-        const today = moment().tz('Europe/Vilnius').format('YYYY-MM-DD');
-        if (this.dailySyncSuppressedDate !== today) {
-          console.log('[Daily Sync Watchdog] Suppression date changed, clearing suppression');
-          this.dailySyncSuppressedDate = null;
-          this.scheduleNextCheckIn5Minutes();
-          actionTaken = 'Cleared suppression - date changed';
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Watchdog', 'success', actionTaken, duration);
-          return;
-        }
-      }
-
-      // No action needed - everything is OK
-      if (!actionTaken) {
-        const duration = Date.now() - startTime;
-        await logScheduledJob('Watchdog', 'success', 'No action needed - sync is healthy', duration);
-      }
-    } catch (error) {
-      console.error('[Daily Sync Watchdog] Error in watchdog check:', error);
-      const duration = Date.now() - startTime;
-      await logScheduledJob('Watchdog', 'error', error.message, duration);
-    }
-  }
-
-  // Fallback cron job: Runs every 15 minutes during active period as safety net
-  startDailySyncFallback() {
-    if (this.dailySyncFallbackCron) {
-      this.dailySyncFallbackCron.stop();
-    }
-
-    // Cron: every 15 minutes from 12:45 to 15:55 CET
-    const cronExpression = '45,0,15,30,45 12-15 * * *';
-    this.dailySyncFallbackCron = cron.schedule(cronExpression, async () => {
-      const startTime = Date.now();
-      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
-      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-      
-      // Only run if we're in active period
-      if (!nowCET.isBetween(activeStart, activeEnd, null, '[]')) {
-        return;
-      }
-
-      // Check if dynamic sync is working
-      const minutesSinceLastCheck = this.dailySyncLastCheck 
-        ? moment().tz('UTC').diff(moment(this.dailySyncLastCheck), 'minutes')
-        : 999;
-
-      // If last check was more than 10 minutes ago, force a check
-      if (minutesSinceLastCheck > 10) {
-        console.warn('[Daily Sync Fallback] ⚠️  Dynamic sync appears stuck, forcing check via fallback cron');
-        try {
-          await this.runDailySyncCheck();
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Fallback Cron', 'success', `Forced check - last check was ${minutesSinceLastCheck} minutes ago`, duration);
-        } catch (error) {
-          console.error('[Daily Sync Fallback] Error in fallback check:', error);
-          const duration = Date.now() - startTime;
-          await logScheduledJob('Fallback Cron', 'error', error.message, duration);
-        }
-      } else {
-        const duration = Date.now() - startTime;
-        console.log('[Daily Sync Fallback] Dynamic sync is working, skipping fallback');
-        await logScheduledJob('Fallback Cron', 'skipped', 'Dynamic sync is working, no action needed', duration);
-      }
-    }, {
-      scheduled: true,
-      timezone: 'Europe/Paris' // CET/CEST timezone
-    });
-
-    console.log('[Daily Sync] Fallback cron started (every 15 min during active period, 12:45-15:55 CET)');
-  }
-
-  // Schedule the next daily sync check (recursive, schedules itself)
-  scheduleNextDailySyncCheck() {
-    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-    const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
-    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-
-    // Check if we're in the active period
-    if (nowCET.isBefore(activeStart)) {
-      // Before active period - schedule for 12:45 CET
-      const msUntilStart = activeStart.diff(nowCET);
-      this.dailySyncNextRun = activeStart.toISOString();
-      this.dailySyncTimeout = setTimeout(() => {
-        this.runDailySyncCheck();
-      }, msUntilStart);
-      console.log(`[Daily Sync] Scheduled first check at 12:45 CET (in ${Math.round(msUntilStart / 1000 / 60)} minutes)`);
-      return;
-    }
-
-    if (nowCET.isAfter(activeEnd)) {
-      // After active period - schedule for tomorrow at 12:45 CET
-      const tomorrowStart = activeStart.clone().add(1, 'day');
-      const msUntilTomorrow = tomorrowStart.diff(nowCET);
-      this.dailySyncNextRun = tomorrowStart.toISOString();
-      this.dailySyncTimeout = setTimeout(() => {
-        this.scheduleNextDailySyncCheck();
-      }, msUntilTomorrow);
-      console.log(`[Daily Sync] Outside active period, scheduling for tomorrow 12:45 CET`);
-      return;
-    }
-
-    // We're in the active period - run check now, then schedule next one
-    this.runDailySyncCheck();
-  }
-
-  // Run a single daily sync check and schedule the next one
-  async runDailySyncCheck() {
-    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-    const startTime = Date.now();
-    
-    // Update last check timestamp (store in UTC for consistency)
-    this.dailySyncLastCheck = moment().tz('UTC').toISOString();
-
-    try {
-      // Check if we should suppress this run
-      if (await this.shouldSuppressDailySyncForToday()) {
-        console.log('[Daily Sync] Suppressed - today is already complete');
-        const duration = Date.now() - startTime;
-        await logScheduledJob('Daily Sync', 'skipped', 'Today is already complete, no sync needed', duration);
-        
-        // Still schedule next check in case data becomes incomplete
-        // But only if we're still in active period
-        if (nowCET.isBefore(activeEnd)) {
-          this.scheduleNextCheckIn5Minutes();
-        }
-        return;
-      }
-
-      console.log(`[Daily Sync] Running daily sync check at ${nowCET.format('HH:mm:ss')} CET...`);
-      try {
-        await this.checkRecentDataSyncByCompleteness();
-        const duration = Date.now() - startTime;
-        await logScheduledJob('Daily Sync', 'success', 'Daily sync check completed', duration);
-      } catch (error) {
-        console.error('[Daily Sync] Error during daily sync:', error.message);
-        const duration = Date.now() - startTime;
-        await logScheduledJob('Daily Sync', 'error', error.message, duration);
-        // Continue scheduling even on error
-      }
-
-      // Schedule next check in 5 minutes (if still in active period)
-      // Always schedule next check, even if there was an error
-      if (nowCET.isBefore(activeEnd)) {
-        this.scheduleNextCheckIn5Minutes();
-      } else {
-        console.log('[Daily Sync] Active period ended, stopping checks for today');
-        this.dailySyncNextRun = null;
-      }
-    } catch (error) {
-      // Critical error - log but ensure we reschedule
-      console.error('[Daily Sync] Critical error in runDailySyncCheck:', error);
-      const duration = Date.now() - startTime;
-      await logScheduledJob('Daily Sync', 'error', `Critical error: ${error.message}`, duration);
-      
-      // Try to reschedule if still in active period
-      if (nowCET.isBefore(activeEnd)) {
-        console.log('[Daily Sync] Attempting to reschedule after error...');
-        this.scheduleNextCheckIn5Minutes();
-      }
-    }
-  }
-
-  // Schedule the next check in exactly 5 minutes
-  scheduleNextCheckIn5Minutes() {
-    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-    const nextCheck = nowCET.clone().add(5, 'minutes');
-    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-
-    // If next check would be after active period, don't schedule
-    if (nextCheck.isAfter(activeEnd)) {
-      console.log('[Daily Sync] Next check would be after active period, stopping');
-      this.dailySyncNextRun = null;
-      return;
-    }
-
-    const msUntilNext = nextCheck.diff(nowCET);
-    this.dailySyncNextRun = nextCheck.toISOString();
-    this.dailySyncTimeout = setTimeout(() => {
-      this.runDailySyncCheck();
-    }, msUntilNext);
-    
-    console.log(`[Daily Sync] Next check scheduled at ${nextCheck.format('HH:mm:ss')} CET (in 5 minutes)`);
-  }
-
-  // Check for missed daily sync jobs on container restart
-  async checkForMissedDailySync() {
-    try {
-      const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-      const today = nowCET.format('YYYY-MM-DD');
-      
-      // Only check if we're in the active period (12:45-15:55 CET)
-      const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
-      const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-      
-      if (nowCET.isBetween(activeStart, activeEnd)) {
-        console.log('[Daily Sync] Container started during active period, checking for missed sync...');
-        
-        // Use country sync status to check if sync is needed
-        await this.checkRecentDataSyncByCompleteness();
-      } else {
-        // Outside active period - just check once if we need to sync
-        console.log('[Daily Sync] Outside active period, checking once if sync needed...');
-        await this.checkOnceOutsideActivePeriod();
-      }
-    } catch (error) {
-      console.error('[Daily Sync] Error checking for missed sync:', error.message);
-    }
-  }
-
-  // Check once outside active period if sync is needed
-  async checkOnceOutsideActivePeriod() {
-    try {
-      // Use country sync status instead of date completeness
-      await this.checkRecentDataSyncByCompleteness();
-    } catch (error) {
-      console.error('[Daily Sync] Error in outside period check:', error.message);
     }
   }
 
@@ -1932,32 +1437,10 @@ class SyncWorker {
       console.log('Stopped next day sync job');
     }
     
-    // Stop daily sync timeout
-    if (this.dailySyncTimeout) {
-      clearTimeout(this.dailySyncTimeout);
-      this.dailySyncTimeout = null;
-      this.dailySyncNextRun = null;
-      console.log('Stopped daily sync timeout');
-    }
-    
-    // Stop watchdog
-    if (this.dailySyncWatchdogInterval) {
-      clearInterval(this.dailySyncWatchdogInterval);
-      this.dailySyncWatchdogInterval = null;
-      console.log('Stopped daily sync watchdog');
-    }
-    
-    // Stop fallback cron
-    if (this.dailySyncFallbackCron) {
-      this.dailySyncFallbackCron.stop();
-      this.dailySyncFallbackCron = null;
-      console.log('Stopped daily sync fallback cron');
-    }
-    
-    // Stop daily sync jobs (legacy cron jobs, if any)
-    if (this.dailySyncJobs && this.dailySyncJobs.length > 0) {
-      this.dailySyncJobs.forEach(job => job.stop());
-      console.log('Stopped daily sync cron jobs');
+    // Stop daily sync scheduler (timeout, watchdog, fallback)
+    if (this.dailyScheduler) {
+      this.dailyScheduler.stop();
+      console.log('Stopped daily sync scheduler');
     }
     
     // Stop health monitoring
@@ -1996,7 +1479,7 @@ class SyncWorker {
       
       // Daily sync: 45,50,55 12 * * *; */5 13-15 * * * (in CET timezone)
       if (cronExpression.includes('45,50,55 12') || cronExpression.includes('*/5 13-15')) {
-        const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
+        const nowCET = nowInReleaseTz();
         const candidates = [];
         
         // First cron: 12:45, 12:50, 12:55 CET
@@ -2061,24 +1544,7 @@ class SyncWorker {
   // Get scheduled job information
   getScheduledJobs() {
     const jobs = [];
-    
-    // Daily sync (using dynamic setTimeout)
-    const nowCET = moment().tz('Europe/Paris'); // CET/CEST timezone
-    const activeStart = nowCET.clone().hour(12).minute(45).second(0).millisecond(0);
-    const activeEnd = nowCET.clone().hour(15).minute(55).second(0).millisecond(0);
-    const isInActivePeriod = nowCET.isBetween(activeStart, activeEnd, null, '[]');
-    
-    jobs.push({
-      name: 'Daily Sync',
-      cron: 'Dynamic (every 5 min) + Fallback (every 15 min)',
-      timezone: 'Europe/Paris',
-      description: 'Every 5 minutes from 12:45 to 15:55 CET (dynamic scheduling with watchdog)',
-      running: this.dailySyncTimeout !== null || (isInActivePeriod && this.dailySyncFallbackCron),
-      nextRun: this.dailySyncNextRun || this.getNextRunTime('45,50,55 12 * * *; */5 13-15 * * *', 'Europe/Paris'),
-      lastCheck: this.dailySyncLastCheck,
-      watchdogActive: this.dailySyncWatchdogInterval !== null,
-      fallbackActive: this.dailySyncFallbackCron !== null
-    });
+    jobs.push(this.dailyScheduler.getDailySyncJobInfo((expr, tz) => this.getNextRunTime(expr, tz)));
     
     // Weekly sync job
     if (this.weeklySyncJob) {
@@ -2125,6 +1591,21 @@ class SyncWorker {
   async triggerManualSync(country = 'lt', daysBack = 1) {
     console.log(`Manual sync triggered for ${country}, ${daysBack} days back`);
     return await this.syncPriceData(country, daysBack);
+  }
+
+  async triggerCatchUpSync() {
+    if (this.isRunning) {
+      throw new Error('Another sync is already running');
+    }
+
+    this.isRunning = true;
+    try {
+      console.log('[Manual Trigger] Running catch-up sync from last sync OK state...');
+      await this.checkAndSyncFromLastSyncOk();
+      return { success: true, message: 'Catch-up sync completed' };
+    } finally {
+      this.isRunning = false;
+    }
   }
 
   // Enhanced historical data sync (for initial setup or data recovery)

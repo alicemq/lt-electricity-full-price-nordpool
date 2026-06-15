@@ -604,6 +604,139 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /sync/status:
+    get:
+      summary: 'Get sync worker status'
+      description: |
+        Returns the current sync worker state including whether a sync is running, scheduled jobs, and in-progress sync metadata. Used by the frontend PWA and ops tooling for smart sync decisions.
+      tags:
+        - Sync
+      responses:
+        '200':
+          description: 'Sync worker status'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      isRunning:
+                        type: boolean
+                      startTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      lastHealthCheck:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      scheduledJobs:
+                        type: array
+                        items:
+                          type: object
+                      currentSync:
+                        type: object
+                        nullable: true
+                      syncInProgress:
+                        type: boolean
+              example:
+                success: true
+                data:
+                  isRunning: false
+                  startTime: null
+                  lastHealthCheck: '2026-06-15T10:30:00.000Z'
+                  scheduledJobs: []
+                  currentSync: null
+                  syncInProgress: false
+        '500':
+          description: 'Failed to get sync status'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sync/trigger:
+    post:
+      summary: 'Trigger manual or catch-up sync'
+      description: |
+        Triggers a sync operation. When `country` is provided in the request body, runs a manual sync for that country over `daysBack` days (default 1). When `country` is omitted, runs a catch-up sync from the last successful sync state.
+      tags:
+        - Sync
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country:
+                  type: string
+                  enum: [lt, ee, lv, fi]
+                  description: 'Country code for manual sync. Omit for catch-up sync.'
+                daysBack:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                  description: 'Number of days to sync when country is specified.'
+            examples:
+              catchUp:
+                summary: 'Catch-up sync (all countries from last OK state)'
+                value: {}
+              manualCountry:
+                summary: 'Manual sync for one country'
+                value:
+                  country: lt
+                  daysBack: 2
+      responses:
+        '200':
+          description: 'Sync completed successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  records:
+                    type: integer
+                    description: 'Present for manual country sync'
+                  country:
+                    type: string
+                    description: 'Present for manual country sync'
+                  daysBack:
+                    type: integer
+                    description: 'Present for manual country sync'
+              examples:
+                catchUp:
+                  value:
+                    success: true
+                    message: 'Catch-up sync completed'
+                manual:
+                  value:
+                    success: true
+                    message: 'Manual sync completed for LT'
+                    records: 96
+                    country: lt
+                    daysBack: 1
+        '409':
+          description: 'Another sync is already running'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Manual sync failed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /sync/reset-initial:
     post:
       summary: 'Reset initial sync status'
