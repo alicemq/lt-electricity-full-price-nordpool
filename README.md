@@ -181,23 +181,26 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 All API endpoints are accessed through the frontend proxy:
 
 ```javascript
-GET /api/v1/nps/prices/:date          // Single date prices
-GET /api/v1/nps/prices/:start/:end    // Date range prices
-GET /api/v1/nps/price/:country/latest // Latest price (Elering-style)
-GET /api/v1/nps/price/:country/current // Current hour price
-GET /api/v1/nps/price/ALL/latest      // Latest prices for all countries
-GET /api/v1/nps/price/ALL/current     // Current hour prices for all countries
-GET /api/v1/latest                    // Latest available prices
-GET /api/v1/countries                 // Available countries
-GET /api/v1/health                    // System health check
-GET /api/sync/status                  // Sync worker status
-POST /api/sync/trigger                // Manual sync trigger
-POST /api/sync/historical             // Historical data sync
-POST /api/sync/year                   // Year data sync
-POST /api/sync/all-historical         // All historical data sync
-GET /api/                             // Swagger UI documentation
-GET /api/openapi.yaml                 // OpenAPI specification
+GET /api/v1/nps/prices?date=YYYY-MM-DD&country=lt     // Single date (query params)
+GET /api/v1/nps/prices?start=YYYY-MM-DD&end=YYYY-MM-DD // Date range (query params)
+GET /api/v1/nps/prices/upcoming?country=lt            // Upcoming prices from current MTU
+GET /api/v1/nps/price/:country/latest                 // Latest price (Elering-style)
+GET /api/v1/nps/price/:country/current                // Current interval price
+GET /api/v1/nps/price/all/latest                      // Latest prices for all countries
+GET /api/v1/nps/price/all/current                     // Current interval prices for all countries
+GET /api/v1/latest                                    // Latest available prices (legacy)
+GET /api/v1/countries                                 // Available countries
+GET /api/v1/health                                    // System health check
+GET /api/v1/sync/status                               // Sync worker status
+POST /api/v1/sync/trigger                             // Manual sync trigger
+POST /api/v1/sync/historical                          // Historical data sync
+POST /api/v1/sync/year                                // Year data sync
+POST /api/v1/sync/all-historical                      // All historical data sync
+GET /api/                                             // Swagger UI documentation
+GET /api/openapi.yaml                                 // OpenAPI specification
 ```
+
+**Legacy paths:** Unversioned `/api/*` requests (for example `GET /api/sync/status`) still work via a deprecation shim that forwards to `/api/v1/*` and returns `Deprecation`, `Link`, and `Warning` headers. Prefer `/api/v1/*` for new code. See [documentation/legacy-api.md](documentation/legacy-api.md).
 
 **Country Codes**: `lt`, `ee`, `lv`, `fi` (case insensitive). When supported by an endpoint, omitting the `country` parameter returns data for all countries.
 

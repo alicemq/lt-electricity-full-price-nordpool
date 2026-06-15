@@ -3,6 +3,8 @@ import v1Router from './v1.js';
 /**
  * Proxy legacy /api/* requests to v1 handlers with deprecation headers.
  * Mount after app.use('/api/v1', v1Router) and before the 404 handler.
+ *
+ * @see documentation/legacy-api.md
  */
 export function legacyApiShim(req, res, next) {
   if (req.path === '/v1' || req.path.startsWith('/v1/')) {
