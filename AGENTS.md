@@ -106,6 +106,17 @@ LFS path: `data/db-backup/*.sql.gz`. Details: [docs/ops/db-backup-lfs.md](docs/o
 
 **Exceptions:** typos in files already changed in the same PR; explicit hotfix (open follow-up issue).
 
+## Work loop (revamp and adoption)
+
+When executing a revamp phase or adoption slice, agents MUST NOT stop after the first deliverable while scoped work remains.
+
+1. **Pick** the next issue or checklist row from the active slice (e.g. UA0–UA2 backlog, adopter validation).
+2. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in this repo or [flows](https://github.com/alicemq/flows/issues).
+3. **Fix → commit → PR** — implement, verify locally, publish; use `Fixes #N` / `Refs #N`.
+4. **Continue** until the slice is complete or you are blocked (document blockers in issue/PR).
+
+The scope gate applies to each unit of work; the work loop governs sequencing across units.
+
 ## Agent roles
 
 | Role | Owns | Exit criteria |
