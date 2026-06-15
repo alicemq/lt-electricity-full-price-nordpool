@@ -26,6 +26,17 @@ const mockUpcoming = {
   meta: { country: 'lt', count: 3, timezone: 'Europe/Vilnius' },
 };
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({
+    meta: {
+      title: { lt: 'Today', en: 'Today' },
+      description: { lt: 'Desc', en: 'Desc' },
+    },
+    path: '/today',
+    fullPath: '/today',
+  }),
+}));
+
 vi.mock('../src/services/priceService.js', () => ({
   fetchPrices: vi.fn(async () => mockPrices),
   fetchUpcomingPrices: vi.fn(async () => mockUpcoming),
@@ -48,6 +59,7 @@ vi.mock('../src/utils/seo.js', () => ({
 vi.mock('../src/i18n.js', () => ({
   default: {
     global: {
+      locale: { value: 'lt' },
       t: (key) => key,
     },
   },
@@ -66,6 +78,7 @@ describe('TodayView smoke', () => {
     const wrapper = mount(TodayView, {
       global: {
         stubs: {
+          VueDatePicker: true,
           PriceTable: {
             template: '<div class="price-table-stub">{{ priceData.length }}</div>',
             props: ['priceData'],
@@ -74,6 +87,7 @@ describe('TodayView smoke', () => {
         mocks: { $t: (key) => key },
       },
     });
+    await flushPromises();
     await flushPromises();
     expect(wrapper.find('.price-table-stub').text()).toBe('3');
   });
@@ -100,6 +114,7 @@ describe('UpcomingPricesView smoke', () => {
         mocks: { $t: (key) => key },
       },
     });
+    await flushPromises();
     await flushPromises();
     expect(wrapper.find('.price-table-stub').text()).toBe('3');
   });
