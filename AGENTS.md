@@ -2,25 +2,49 @@
 
 **Read this first.** This repo tracks Baltic NordPool electricity prices (LT, EE, LV, FI) via a Vue 3 frontend, Express API, and PostgreSQL.
 
-## Cornerstone: flows v0.6.2
+## Scope
 
-Agent workflow patterns come from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.2**. Install or refresh templates:
+### In scope
+
+- Nordpool application: Vue frontend, Express API, PostgreSQL, PWA, sync worker, Coolify deploy
+- Nordpool issues, PRs, CI, and revamp phases (UA0–UA10 checklist adapted locally)
+
+### Out of scope
+
+- Contributing to [alicemq/flows](https://github.com/alicemq/flows): no flows issues, PRs, or releases from this project unless the Product Owner explicitly requests it
+- Treating flows as a dependency to maintain or upgrade on a schedule
+- Reporting adoption gaps upstream to flows (file a Nordpool issue instead)
+
+## Hybrid flows reference (read-only)
+
+Agent workflow patterns were borrowed from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.2**. Flows is reference material only, not a product dependency.
+
+- **Pinned tag:** v0.6.2 (record here when intentionally bumping)
+- **Local copy:** git submodule at `vendor/flows` @ v0.6.2 — read handbook and templates there (`vendor/flows/README.md`, `vendor/flows/examples/nordpool-revamp-checklist.md`)
+- **Clone without submodule:** `git clone --depth 1 --branch v0.6.2 https://github.com/alicemq/flows.git ../flows` (one-time; optional)
+- **Template sync:** run `install.sh` only when intentionally copying templates into Nordpool:
 
 ```bash
-git clone --depth 1 --branch v0.6.2 https://github.com/alicemq/flows.git /tmp/flows
-/tmp/flows/install.sh --target . --phase ua0 --project-name nordpool
+git submodule update --init vendor/flows   # if submodule not checked out
+vendor/flows/install.sh --target . --layout legacy-api-backend \
+  --frontend-dir electricity-prices-build --phase ua0 --project-name nordpool
 ```
 
-Reference checklist: `examples/nordpool-revamp-checklist.md` in flows. Phase 0/1 (this repo) covers UA0 hygiene and partial UA1/UA2; see GitHub issues #2 (UA0), #3 (secrets), #4 (CI).
+Do **not** open Nordpool work to maintain or patch `vendor/flows`. Update the submodule pin only when a PO-approved revamp slice needs a newer tagged release.
+
+Reference checklist: `vendor/flows/examples/nordpool-revamp-checklist.md`. Phase 0/1 (this repo) covers UA0 hygiene and partial UA1/UA2; see GitHub issues #2 (UA0), #3 (secrets), #4 (CI).
 
 ## Flows sync ritual
 
-When flows ships a tag relevant to this adopter, sync templates before starting a new revamp slice:
+When reviewing whether to refresh templates before a new revamp slice:
 
-1. **Pin tag** — record the flows version in this file (`Cornerstone` above). Prefer tagged releases over `main`.
-2. **Upgrade** — shallow-clone the tag, run `install.sh` for the target phase only (e.g. `--phase ua0`, then `--phase ua2` when CI/env work starts). Review the diff; commit product-specific fills separately from generic template copies.
-3. **Upstream gaps** — debt or missing patterns discovered during adoption MUST be filed in [flows/issues](https://github.com/alicemq/flows/issues) with `source:ai` and a link back here. Do not fork flows conventions silently in this repo.
-4. **Adopter checklist** — walk `examples/nordpool-revamp-checklist.md` row by row; mark exit criteria in the matching GitHub issue or PR. Blockers table at the top requires human decisions before UA0 feature work.
+1. **Pin review (optional)** — confirm v0.6.2 still matches needs; bump the pin in this file only when PO approves a template refresh.
+2. **Read local reference** — use `vendor/flows` (submodule) or a tagged release checkout; do not track flows `main`.
+3. **Copy-in when needed** — run `vendor/flows/install.sh --layout legacy-api-backend --frontend-dir electricity-prices-build` for the target phase only. Review the diff; commit product-specific fills separately from generic template copies.
+4. **Nordpool gaps only** — debt or missing patterns discovered during adoption MUST be filed in [this repo's issues](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues) with `source:ai`. Do not fork flows conventions silently here.
+5. **Adopter checklist** — walk `vendor/flows/examples/nordpool-revamp-checklist.md` row by row; mark exit criteria in the matching Nordpool issue or PR. Blockers table at the top requires human decisions before UA0 feature work.
+
+No flows repo work (issues, PRs, releases) from Nordpool unless PO explicitly requests it.
 
 ## What this product is
 
@@ -54,6 +78,7 @@ backend/src/v1.js      # v1 price routes (large — split planned UA5)
 electricity-prices-build/src/   # Vue SPA
 swagger-ui/openapi.yaml         # OpenAPI source of truth (UA3 will consolidate duplicates)
 database/init/                  # Schema bootstrap (single source of truth)
+vendor/flows/                   # Read-only flows v0.6.2 reference (submodule; do not patch)
 ```
 
 **Do not modify in foundation/revamp phases unless explicitly scoped:**
@@ -83,7 +108,7 @@ OpenAPI: `swagger-ui/openapi.yaml`. HTTP contract changes MUST update OpenAPI in
 
 ## Gap reporting (agents)
 
-When you find a defect, missing test, doc drift, or scope gap during work and you are **not** fixing it in the current PR, you MUST open a GitHub issue (label `source:ai`, appropriate `type:*`) before ending the session. Link the issue from your PR or handoff notes.
+When you find a defect, missing test, doc drift, or scope gap during work and you are **not** fixing it in the current PR, you MUST open a GitHub issue in **this repo** (label `source:ai`, appropriate `type:*`) before ending the session. Link the issue from your PR or handoff notes. Do not file flows upstream issues from Nordpool work.
 
 ## Secrets policy
 
@@ -141,8 +166,8 @@ Agents **MUST**:
 
 When executing a revamp phase or adoption slice, agents MUST NOT stop after the first deliverable while scoped work remains.
 
-1. **Pick** the next issue or checklist row from the active slice (e.g. UA0–UA2 backlog, adopter validation).
-2. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in this repo or [flows](https://github.com/alicemq/flows/issues).
+1. **Pick** the next issue or checklist row from the active slice (e.g. UA0–UA2 backlog, local revamp validation).
+2. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in **this repo only**.
 3. **Fix → commit → PR** — implement, verify locally, publish; use `Fixes #N` / `Refs #N`.
 4. **Merge when CI green** — squash-merge to `main` (repo default) when required checks pass, unless the user said "do not merge" or the PR needs a human review hold. Merging is not a stop point; agents continue the slice unless blocked.
 5. **Rebase stacked PRs** — immediately update dependent branches onto `main`. **Merge order:** foundation/lowest stack PR first, then dependents top-down. When a stack spans backend and frontend, merge backend PRs before frontend PRs so proxy routes and API contracts land first (see #50).
@@ -181,6 +206,8 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | UA1 | `/ready`, env single source, nginx alignment | Follow-up |
 | UA2 | CI fixture DB, integration tests | Partial (#4) |
 | UA3+ | OpenAPI repair, golden tests, sync split, PWA | Planned |
+
+Checklist source: `vendor/flows/examples/nordpool-revamp-checklist.md` (read-only reference).
 
 ## Writing style
 
