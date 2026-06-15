@@ -7,6 +7,7 @@ Fresh installs use a single init script. There is no incremental migration runne
 | Path | Purpose |
 | --- | --- |
 | `init/01_schema.sql` | Full schema, seed data, and configuration rows |
+| `fixtures/ci_seed.sql` | Slim CI golden fixture (Postgres service in `ci-integration.yml`) |
 | `../data/db-backup/` | Optional LFS fixture dump for dev/CI (see `docs/ops/db-backup-lfs.md`) |
 
 ## Fresh install

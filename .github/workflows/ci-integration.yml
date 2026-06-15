@@ -1,0 +1,80 @@
+name: CI Integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'database/**'
+      - 'tests/golden/**'
+      - '.github/workflows/ci-integration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'database/**'
+      - 'tests/golden/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-golden:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: electricity_user
+          POSTGRES_PASSWORD: ci_password_change_me
+          POSTGRES_DB: electricity_prices
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U electricity_user -d electricity_prices"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Initialize schema
+        env:
+          PGPASSWORD: ci_password_change_me
+        run: |
+          psql -h 127.0.0.1 -U electricity_user -d electricity_prices -f database/init/01_schema.sql
+
+      - name: Load CI seed fixture
+        env:
+          PGPASSWORD: ci_password_change_me
+        run: psql -h 127.0.0.1 -U electricity_user -d electricity_prices -f database/fixtures/ci_seed.sql
+
+      - name: Start API
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://electricity_user:ci_password_change_me@127.0.0.1:5432/electricity_prices
+          PORT: '3001'
+          NODE_ENV: test
+        run: |
+          node src/index.js &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3001/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3001/health || (echo "API failed to start" && exit 1)
+
+      - name: Golden runner
+        env:
+          INTEGRATION_TESTS: '1'
+          API_URL: http://127.0.0.1:3001
+        run: node tests/golden/runner.test.js

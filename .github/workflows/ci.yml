@@ -48,6 +48,9 @@ jobs:
         working-directory: electricity-prices-build
         run: npm run build
 
+      - name: Golden runner (integration gate skip)
+        run: node tests/golden/runner.test.js
+
       - name: Repo hygiene files
         run: |
           test -f AGENTS.md
@@ -56,6 +59,8 @@ jobs:
           test -f swagger-ui/openapi.yaml
           test -f deploy/local.env.example
           test -f bin/smoke-local.sh
+          test -f database/fixtures/ci_seed.sql
+          test -f tests/golden/scenarios.json
 
       - name: OpenAPI structure check
         run: |
@@ -91,6 +96,14 @@ jobs:
           else
             echo "vendor/flows gitlink matches origin/main ($LOCAL)"
           fi
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build backend and frontend images
+        run: docker compose build backend frontend
 
   secret-scan:
     runs-on: ubuntu-latest

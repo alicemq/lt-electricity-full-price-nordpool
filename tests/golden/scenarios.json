@@ -1,0 +1,36 @@
+[
+  {
+    "id": "G1-health",
+    "description": "Liveness returns success",
+    "method": "GET",
+    "path": "/health",
+    "expectStatus": 200,
+    "expectBody": { "success": true }
+  },
+  {
+    "id": "G2-prices-normal-day",
+    "description": "Prices for 2024-06-15 return 24 hourly MTUs",
+    "method": "GET",
+    "path": "/api/v1/nps/prices?date=2024-06-15&country=lt",
+    "expectStatus": 200,
+    "expectBody": { "success": true },
+    "expectMeta": { "count": 24, "timezone": "Europe/Vilnius" }
+  },
+  {
+    "id": "G3-prices-dst-spring",
+    "description": "Prices for 2025-03-30 DST spring-forward day return 23 hourly MTUs",
+    "method": "GET",
+    "path": "/api/v1/nps/prices?date=2025-03-30&country=lt",
+    "expectStatus": 200,
+    "expectBody": { "success": true },
+    "expectMeta": { "count": 23, "timezone": "Europe/Vilnius" }
+  },
+  {
+    "id": "G4-prices-first-timestamp",
+    "description": "First MTU price matches CI fixture seed",
+    "method": "GET",
+    "path": "/api/v1/nps/prices?date=2024-06-15&country=lt",
+    "expectStatus": 200,
+    "expectDataFirstPrice": 45.5
+  }
+]
