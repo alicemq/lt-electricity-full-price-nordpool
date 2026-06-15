@@ -1,13 +1,20 @@
 <script setup>
-import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { RouterLink } from 'vue-router'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import moment from 'moment-timezone';
 import { fetchPrices, onPricesUpdated, runSmartSync } from '../services/priceService';
-import { logAllPriceBreakdowns } from '../services/priceCalculationService';
+import { calculatePrice, logAllPriceBreakdowns } from '../services/priceCalculationService';
 import PriceTable from '../components/PriceTable.vue';
+import i18n from '../i18n';
+import {
+  setSEO,
+  buildRouteStructuredData,
+  generatePriceDataStructuredData,
+} from '../utils/seo';
 
 moment.tz.setDefault("Europe/Vilnius");
 
+const route = useRoute();
 const date = ref(new Date());
 const minDate = ref(new Date("2012-07-01"));
 const priceData = ref([]);
@@ -75,6 +82,42 @@ onUnmounted(() => {
 watch(date, () => {
   reloadPrices();
 });
+
+function updateTodaySEO() {
+  const locale = i18n.global.locale.value || 'lt';
+  const meta = route.meta || {};
+  const title = meta.title?.[locale] || meta.title || 'Elektros kaina LT';
+  const description = meta.description?.[locale] || meta.description ||
+    (locale === 'lt'
+      ? 'Rodykite Nord Pool elektros kainas su visais taikomais mokesčiais ir prievolėmis. Kainos atnaujinamos automatiškai.'
+      : 'Display Nord Pool electricity prices with all applicable taxes and fees. Prices are updated automatically.');
+  const dateStr = moment(date.value).format('YYYY-MM-DD');
+  const path = `/today?date=${dateStr}`;
+
+  const extraStructuredData = [];
+  if (priceData.value.length > 0) {
+    const prices = priceData.value.map((entry) => parseFloat(calculatePrice(entry)));
+    const averagePrice = prices.reduce((sum, value) => sum + value, 0) / prices.length;
+    extraStructuredData.push(generatePriceDataStructuredData({
+      date: dateStr,
+      averagePrice,
+      minPrice: Math.min(...prices),
+      maxPrice: Math.max(...prices),
+    }));
+  }
+
+  setSEO({
+    title,
+    description,
+    url: path,
+    locale,
+    structuredData: buildRouteStructuredData({ ...route, fullPath: path, path: '/today' }, locale, extraStructuredData),
+  });
+}
+
+watch([priceData, date], () => {
+  updateTodaySEO();
+}, { deep: true });
 
 function setToday() {
   date.value = new Date();

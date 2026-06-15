@@ -11,7 +11,7 @@ Allow: /android-chrome-*.png
 Allow: /apple-touch-icon.png
 Allow: /favicon-*.png
 
-# Sitemap location
+# Sitemap location (generated at build time into dist/sitemap.xml)
 Sitemap: https://elektra.teletigras.lt/sitemap.xml
 
 # Disallow API endpoints from being indexed

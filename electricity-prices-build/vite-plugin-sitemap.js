@@ -14,88 +14,97 @@ function getFileLastMod(filePath) {
   }
 }
 
+function getRecentDates(days) {
+  const dates = []
+  const today = new Date()
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - i)
+    dates.push(date.toISOString().split('T')[0])
+  }
+  return dates
+}
+
+function hreflangLinks(baseUrl, path) {
+  const ltHref = `${baseUrl}${path}`
+  const separator = path.includes('?') ? '&' : '?'
+  const enHref = `${baseUrl}${path}${separator}lang=en`
+  return `    <xhtml:link rel="alternate" hreflang="lt" href="${ltHref}"/>
+    <xhtml:link rel="alternate" hreflang="en" href="${enHref}"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="${ltHref}"/>`
+}
+
+function urlEntry({ baseUrl, path, lastmod, changefreq, priority }) {
+  return `  <url>
+    <loc>${baseUrl}${path}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+${hreflangLinks(baseUrl, path)}
+  </url>`
+}
+
 /**
- * Vite plugin to generate sitemap.xml dynamically at build time
- * Uses accurate lastmod dates based on content type:
- * - Dynamic pages (price data): current date
- * - Static pages: file modification date
+ * Vite plugin to generate sitemap.xml dynamically at build time.
+ * Build output is the sole source of truth; do not commit public/sitemap.xml.
  */
 export function sitemapPlugin() {
   let outputDir = 'dist'
   let rootDir = ''
-  
+
   const generateSitemap = () => {
-      // Read package.json to get homepage
-      const packageJsonPath = new URL('./package.json', import.meta.url)
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
-      
-      const baseUrl = process.env.VITE_BASE_URL || 
-                     packageJson.homepage || 
-                     'https://elektra.teletigras.lt'
-      
-      const today = new Date().toISOString().split('T')[0]
-      
-      // Get last modification dates for static pages
-      const aboutViewPath = resolve(rootDir, 'src/views/AboutView.vue')
-      const settingsViewPath = resolve(rootDir, 'src/views/SettingsView.vue')
-      const statusViewPath = resolve(rootDir, 'src/views/StatusView.vue')
-      const routerPath = resolve(rootDir, 'src/router/index.js')
-      
-      // Use file modification date for static pages, current date for dynamic content
-      const aboutLastMod = getFileLastMod(aboutViewPath)
-      const settingsLastMod = getFileLastMod(settingsViewPath)
-      const statusLastMod = getFileLastMod(statusViewPath)
-      // Use router or app file for homepage/upcoming (they're dynamic but structure changes less)
-      const appLastMod = getFileLastMod(routerPath)
-      
-      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+    const packageJsonPath = new URL('./package.json', import.meta.url)
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+
+    const baseUrl = process.env.VITE_BASE_URL ||
+      packageJson.homepage ||
+      'https://elektra.teletigras.lt'
+
+    const today = new Date().toISOString().split('T')[0]
+    const recentDates = getRecentDates(14)
+
+    const aboutViewPath = resolve(rootDir, 'src/views/AboutView.vue')
+    const settingsViewPath = resolve(rootDir, 'src/views/SettingsView.vue')
+    const statusViewPath = resolve(rootDir, 'src/views/StatusView.vue')
+    const routerPath = resolve(rootDir, 'src/router/index.js')
+
+    const aboutLastMod = getFileLastMod(aboutViewPath)
+    const settingsLastMod = getFileLastMod(settingsViewPath)
+    const statusLastMod = getFileLastMod(statusViewPath)
+    const appLastMod = getFileLastMod(routerPath)
+
+    const staticPages = [
+      { path: '/', lastmod: appLastMod, changefreq: 'daily', priority: '1.0' },
+      { path: '/upcoming', lastmod: today, changefreq: 'hourly', priority: '0.9' },
+      { path: '/today', lastmod: today, changefreq: 'hourly', priority: '0.9' },
+      { path: '/settings', lastmod: settingsLastMod, changefreq: 'monthly', priority: '0.5' },
+      { path: '/about', lastmod: aboutLastMod, changefreq: 'monthly', priority: '0.6' },
+      { path: '/status', lastmod: statusLastMod, changefreq: 'daily', priority: '0.4' },
+    ]
+
+    const datedTodayPages = recentDates.map((date) => ({
+      path: `/today?date=${date}`,
+      lastmod: date,
+      changefreq: 'daily',
+      priority: '0.8',
+    }))
+
+    const entries = [...staticPages, ...datedTodayPages]
+      .map((entry) => urlEntry({ baseUrl, ...entry }))
+      .join('\n')
+
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  <url>
-    <loc>${baseUrl}/</loc>
-    <lastmod>${appLastMod}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/upcoming</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/today</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/settings</loc>
-    <lastmod>${settingsLastMod}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/about</loc>
-    <lastmod>${aboutLastMod}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/status</loc>
-    <lastmod>${statusLastMod}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.4</priority>
-  </url>
+${entries}
 </urlset>
 `
-      
-      // Write to output directory
-      const outputPath = resolve(process.cwd(), outputDir, 'sitemap.xml')
-      writeFileSync(outputPath, sitemap, 'utf-8')
-      console.log(`✓ Generated sitemap.xml with accurate lastmod dates at ${outputPath}`)
-    }
-  
+
+    const outputPath = resolve(process.cwd(), outputDir, 'sitemap.xml')
+    writeFileSync(outputPath, sitemap, 'utf-8')
+    console.log(`✓ Generated sitemap.xml (${entries.split('<url>').length - 1} URLs) at ${outputPath}`)
+  }
+
   return {
     name: 'sitemap-generator',
     configResolved(config) {
@@ -103,9 +112,7 @@ export function sitemapPlugin() {
       rootDir = config.root || process.cwd()
     },
     closeBundle() {
-      // Generate sitemap after build is complete
       generateSitemap()
-    }
+    },
   }
 }
-
