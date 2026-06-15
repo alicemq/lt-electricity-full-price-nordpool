@@ -1,0 +1,3 @@
+[submodule "vendor/flows"]
+	path = vendor/flows
+	url = https://github.com/alicemq/flows
