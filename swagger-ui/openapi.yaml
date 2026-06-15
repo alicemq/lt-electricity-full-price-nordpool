@@ -1411,6 +1411,107 @@ paths:
         '404':
           description: 'Unknown job key'
 
+  /push/vapid-public:
+    get:
+      summary: 'Get VAPID public key for push subscription'
+      tags:
+        - Push
+      responses:
+        '200':
+          description: 'Public key for client pushManager.subscribe'
+        '503':
+          description: 'Push not configured'
+
+  /push/status:
+    get:
+      summary: 'Whether push is configured on the server'
+      tags:
+        - Push
+      responses:
+        '200':
+          description: 'Configuration status'
+
+  /push/subscribe:
+    post:
+      summary: 'Register web push subscription'
+      tags:
+        - Push
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: 'Subscription stored'
+        '400':
+          description: 'Invalid subscription payload'
+        '503':
+          description: 'Push not configured'
+    delete:
+      summary: 'Deactivate web push subscription'
+      tags:
+        - Push
+      responses:
+        '200':
+          description: 'Subscription deactivated'
+
+  /push/test:
+    post:
+      summary: 'Send test push to own subscription'
+      tags:
+        - Push
+      responses:
+        '200':
+          description: 'Notification sent'
+        '404':
+          description: 'Subscription not found'
+
+  /admin/push/stats:
+    get:
+      summary: 'Push subscription and delivery stats (admin)'
+      tags:
+        - Admin
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 'Stats payload'
+
+  /admin/push/deliveries:
+    get:
+      summary: 'Recent push deliveries and failures (admin)'
+      tags:
+        - Admin
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 'Delivery log'
+
+  /admin/push/test:
+    post:
+      summary: 'Send test push to subscription by id (admin)'
+      tags:
+        - Admin
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 'Notification sent'
+
+  /admin/push/broadcast:
+    post:
+      summary: 'Broadcast push to active subscriptions (admin)'
+      tags:
+        - Admin
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 'Broadcast summary'
+
 components:
   schemas:
     Country:

@@ -112,6 +112,19 @@ FRONTEND_PORT=8080
 NODE_ENV=production
 ELERING_API_URL=https://dashboard.elering.ee/api/nps/price
 VITE_API_BASE_URL=/api/v1
+ADMIN_API_TOKEN=your_admin_token_here
+```
+
+**Web Push (optional)** — required only for push subscribe/broadcast admin APIs:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+```env
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_SUBJECT=mailto:ops@yourdomain.com
 ```
 
 **Important Notes**:

@@ -20,17 +20,35 @@ function expressPathToOpenApi(routePath) {
   return routePath.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, '{$1}');
 }
 
-function extractV1Routes(source) {
+function extractV1Routes(source, prefix = '') {
   const routes = new Map();
   const pattern = /router\.(get|post|put|delete|patch)\(\s*['"]([^'"]+)['"]/g;
   let match = pattern.exec(source);
   while (match) {
     const method = match[1].toUpperCase();
-    const openApiPath = expressPathToOpenApi(match[2]);
+    const openApiPath = prefix + expressPathToOpenApi(match[2]);
     const key = `${method} ${openApiPath}`;
     routes.set(key, { method, path: openApiPath });
     match = pattern.exec(source);
   }
+  return routes;
+}
+
+function loadRouteMaps() {
+  const routes = new Map();
+  const routeFiles = [
+    { file: 'backend/src/v1.js', prefix: '' },
+    { file: 'backend/src/push/router.js', prefix: '/push' },
+    { file: 'backend/src/push/adminRouter.js', prefix: '/admin/push' },
+  ];
+
+  for (const { file, prefix } of routeFiles) {
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    for (const [key, route] of extractV1Routes(source, prefix)) {
+      routes.set(key, route);
+    }
+  }
+
   return routes;
 }
 
@@ -48,9 +66,8 @@ function extractOpenApiPaths(doc) {
   return routes;
 }
 
-const v1Source = fs.readFileSync(v1Path, 'utf8');
 const openApiDoc = yaml.load(fs.readFileSync(yamlPath, 'utf8'));
-const v1Routes = extractV1Routes(v1Source);
+const v1Routes = loadRouteMaps();
 const specRoutes = extractOpenApiPaths(openApiDoc);
 
 const missingInSpec = [];
