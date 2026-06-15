@@ -112,7 +112,7 @@ server: {
       secure: false
     },
     '/api': {
-      target: 'http://swagger-ui:8080/swagger',
+      target: 'http://swagger-ui:8080',
       changeOrigin: true,
       secure: false
     }

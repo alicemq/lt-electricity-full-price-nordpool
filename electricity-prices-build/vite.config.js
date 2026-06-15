@@ -7,6 +7,22 @@ import { sitemapPlugin } from './vite-plugin-sitemap.js'
 // Read package.json to get homepage
 const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
 
+function docsRedirectPlugin() {
+  return {
+    name: 'docs-redirect',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/docs' || req.url === '/docs/') {
+          res.writeHead(302, { Location: '/api/' })
+          res.end()
+          return
+        }
+        next()
+      })
+    },
+  }
+}
+
 function googleSiteVerificationPlugin(verificationCode) {
   return {
     name: 'google-site-verification',
@@ -32,6 +48,7 @@ export default defineConfig(({ mode }) => {
     vue(),
     sitemapPlugin(),
     googleSiteVerificationPlugin(googleVerification),
+    docsRedirectPlugin(),
   ],
   define: {
     // Inject homepage from package.json as environment variable

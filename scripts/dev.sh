@@ -25,8 +25,14 @@ sync_postgres_password_between_files "$ENV_FILE" "$LOCAL_ENV_FILE" || true
 
 cp "$ENV_FILE" .env
 
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.dev.yml)
+if [ -f docker-compose.dev.local.yml ]; then
+  COMPOSE_FILES+=(-f docker-compose.dev.local.yml)
+  echo "Including docker-compose.dev.local.yml (local port overrides)."
+fi
+
 # Build and start services with development override
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file "$ENV_FILE" up -d --build
+docker-compose "${COMPOSE_FILES[@]}" --env-file "$ENV_FILE" up -d --build
 
 echo "✅ Development environment started!"
 echo ""
@@ -40,8 +46,12 @@ echo "  - Frontend (Vue.js + Vite)"
 echo "  - Backend (Express + nodemon)"
 echo "  - Data Sync (nodemon)"
 echo ""
+COMPOSE_HINT="docker-compose -f docker-compose.yml -f docker-compose.dev.yml"
+if [ -f docker-compose.dev.local.yml ]; then
+  COMPOSE_HINT="${COMPOSE_HINT} -f docker-compose.dev.local.yml"
+fi
 echo "📊 View logs:"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.dev.yml logs -f"
+echo "  ${COMPOSE_HINT} logs -f"
 echo ""
 echo "🛑 Stop services:"
-echo "  docker-compose -f docker-compose.yml -f docker-compose.dev.yml down" 
+echo "  ${COMPOSE_HINT} down" 
