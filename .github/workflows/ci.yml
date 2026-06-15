@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Validate Docker Compose
         run: |
@@ -68,6 +70,17 @@ jobs:
 
       - name: OpenAPI JSON sync check
         run: node bin/openapi-json-from-yaml.js --check
+
+      - name: Warn if vendor/flows is behind origin/main
+        run: |
+          git -C vendor/flows fetch origin main
+          LOCAL=$(git -C vendor/flows rev-parse HEAD)
+          REMOTE=$(git -C vendor/flows rev-parse origin/main)
+          if [ "$LOCAL" != "$REMOTE" ]; then
+            echo "::warning title=Stale flows submodule::vendor/flows ($LOCAL) is behind origin/main ($REMOTE). Run: git submodule update --remote vendor/flows"
+          else
+            echo "vendor/flows matches origin/main ($LOCAL)"
+          fi
 
   secret-scan:
     runs-on: ubuntu-latest
