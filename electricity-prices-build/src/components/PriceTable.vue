@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import moment from 'moment-timezone';
 import { formatPriceHours, isCurrentHour } from '../services/timeService';
 import { calculatePrice, getTimePeriod } from '../services/priceCalculationService';
@@ -57,6 +57,18 @@ watch(() => props.priceData, (newData) => {
 }, { deep: true });
 
 const settings = ref(getColorThresholdSettings());
+
+function onAlertSettingsUpdated(event) {
+  settings.value = { ...event.detail.colorThresholds };
+}
+
+onMounted(() => {
+  window.addEventListener('alertSettingsUpdated', onAlertSettingsUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('alertSettingsUpdated', onAlertSettingsUpdated);
+});
 
 const averagePrice = computed(() => {
   // Use allPriceData for average calculation if provided, otherwise use priceData

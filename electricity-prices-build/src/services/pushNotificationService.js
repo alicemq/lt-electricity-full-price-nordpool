@@ -138,7 +138,7 @@ export async function subscribeToPush(settings = loadAlertSettings()) {
     }
 
     return postSubscribeBody({
-      alertPreferences: getSubscriptionMetadata(settings),
+      productPayload: getSubscriptionMetadata(settings),
       timezone: settings.timezone,
       pushSubscription: sub.toJSON(),
     });
@@ -148,28 +148,26 @@ export async function subscribeToPush(settings = loadAlertSettings()) {
 }
 
 export async function syncPushSubscription(settings = loadAlertSettings()) {
-  const id = localStorage.getItem(SUB_ID_KEY);
-  const manageToken = localStorage.getItem(MANAGE_TOKEN_KEY);
-  if (!id || !manageToken) {
+  const env = getPushEnvironmentStatus();
+  if (!env.ready || !('serviceWorker' in navigator)) {
     return { ok: false, skipped: true };
   }
 
-  const res = await fetch(subscribeUrl(), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id,
-      manageToken,
-      alertPreferences: getSubscriptionMetadata(settings),
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (!sub) {
+      return { ok: false, skipped: true };
+    }
+
+    return postSubscribeBody({
+      productPayload: getSubscriptionMetadata(settings),
       timezone: settings.timezone,
-    }),
-  });
-
-  if (res.status === 404) {
-    return { ok: false, unavailable: true };
+      pushSubscription: sub.toJSON(),
+    });
+  } catch {
+    return { ok: false, skipped: true };
   }
-
-  return { ok: res.ok };
 }
 
 export async function unsubscribeFromPush() {
