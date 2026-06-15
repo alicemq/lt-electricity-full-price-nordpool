@@ -126,7 +126,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
 ./bin/smoke-local.sh
 npm ci --prefix backend && npm ci --prefix electricity-prices-build
 npm run build --prefix electricity-prices-build
+npm test --prefix backend
+npm test --prefix electricity-prices-build
+node --test tests/seo/sitemap.routes.test.js
 ```
+
+Golden integration harness (Postgres fixture + API scenarios): see [docs/testing/golden-harness.md](docs/testing/golden-harness.md).
 
 Copy `deploy/local.env.example` to `deploy/local.env` for port overrides.
 

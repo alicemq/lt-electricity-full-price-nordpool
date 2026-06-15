@@ -1,0 +1,59 @@
+# Golden test harness
+
+Nordpool uses a layered test pyramid. Golden acceptance tests live in `tests/golden/`.
+
+## Layout
+
+| Path | Purpose |
+| --- | --- |
+| `tests/golden/scenarios.json` | Domain acceptance cases (price dates, DST counts) |
+| `tests/golden/runner.test.js` | HTTP runner with `INTEGRATION_TESTS` gate |
+| `database/fixtures/ci_seed.sql` | Postgres fixture for CI integration job |
+| `electricity-prices-build/tests/views.smoke.test.js` | Today + Upcoming render with mocked API |
+| `tests/seo/sitemap.routes.test.js` | Sitemap route coverage snapshot |
+| `.github/workflows/ci-integration.yml` | Postgres + seed + golden runner on PR |
+| `.github/workflows/lighthouse.yml` | Lighthouse CI starter (warn thresholds) |
+
+## Run locally
+
+### Unit + smoke (no Docker)
+
+```bash
+npm ci --prefix backend && npm test --prefix backend
+npm ci --prefix electricity-prices-build && npm test --prefix electricity-prices-build
+node --test tests/seo/sitemap.routes.test.js
+node tests/golden/runner.test.js   # exits 0 (skipped)
+```
+
+### Golden integration (Postgres + API)
+
+```bash
+docker compose up -d db
+export DATABASE_URL=postgresql://electricity_user:electricity_password@127.0.0.1:5432/electricity_prices
+psql "$DATABASE_URL" -f database/init/01_schema.sql
+psql "$DATABASE_URL" -f database/fixtures/ci_seed.sql
+npm ci --prefix backend
+PORT=3001 DATABASE_URL="$DATABASE_URL" node backend/src/index.js &
+INTEGRATION_TESTS=1 API_URL=http://127.0.0.1:3001 node tests/golden/runner.test.js
+```
+
+### Lighthouse CI (after frontend build)
+
+```bash
+npm run build --prefix electricity-prices-build
+npx --yes @lhci/cli@0.14.0 autorun --config=electricity-prices-build/lighthouserc.json
+```
+
+## Lighthouse baseline (starter thresholds)
+
+Configured in `electricity-prices-build/lighthouserc.json` as **warn** gates until PWA manifest work lands:
+
+| Category | Min score |
+| --- | --- |
+| performance | 0.70 |
+| accessibility | 0.85 |
+| best-practices | 0.85 |
+| seo | 0.85 |
+| pwa | 0.50 |
+
+Raise thresholds in a follow-up issue once PWA category stabilizes.
