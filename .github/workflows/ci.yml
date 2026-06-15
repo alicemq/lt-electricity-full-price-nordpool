@@ -87,6 +87,9 @@ jobs:
       - name: OpenAPI route parity check
         run: node bin/validate-openapi-routes.js
 
+      - name: OpenAPI Spectral lint (UA3 baseline)
+        run: npx --yes @stoplight/spectral-cli@6.15.0 lint swagger-ui/openapi.yaml
+
       - name: Warn if vendor/flows is behind origin/main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
