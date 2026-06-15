@@ -69,6 +69,9 @@ jobs:
       - name: OpenAPI JSON sync check
         run: node bin/openapi-json-from-yaml.js --check
 
+      - name: OpenAPI route parity check
+        run: node bin/validate-openapi-routes.js
+
       - name: Warn if vendor/flows is behind origin/main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

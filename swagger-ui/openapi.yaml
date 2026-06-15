@@ -33,16 +33,23 @@ info:
     - **No current limits**: API designed for public access
     - **Caching**: Database-based caching for optimal performance
     - **Monitoring**: All requests logged for analytics
+
+    ## Legacy `/api/*` paths (deprecated)
+    Requests to `/api/*` (without the `/v1` segment) are handled by a compatibility shim that
+    forwards to the matching `/api/v1/*` handler. Responses include RFC 8594 deprecation headers:
+    `Deprecation: true`, `Link: </api/v1/...>; rel="successor-version"`, and
+    `Warning: 299 - "Legacy /api/* path; use /api/v1/*"`. Prefer `/api/v1/*` for new integrations.
+    See `documentation/legacy-api.md` for details.
     
   contact:
     name: 'Electricity Prices Team'
-    url: 'https://github.com/your-repo/electricity-prices'
+    url: 'https://github.com/alicemq/lt-electricity-full-price-nordpool'
   license:
     name: 'AGPL-3.0-only'
     url: 'https://www.gnu.org/licenses/agpl-3.0.html'
   externalDocs:
     description: 'Project Documentation'
-    url: 'https://github.com/your-repo/electricity-prices/blob/main/README.md'
+    url: 'https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/README.md'
 servers:
   - url: /api/v1
     description: 'Production API Server (via proxy)'
@@ -536,9 +543,11 @@ paths:
   /latest:
     get:
       summary: 'Get latest price (legacy endpoint)'
-      description: 'Legacy endpoint for backward compatibility'
+      description: |
+        **Deprecated.** Legacy compatibility endpoint. Prefer `GET /nps/price/{country}/latest`.
+      deprecated: true
       tags:
-        - Prices
+        - Legacy
       parameters:
         - name: country
           in: query
@@ -590,6 +599,103 @@ paths:
                   last_updated: '2025-06-26T00:15:30.024Z'
         '404':
           description: 'No price data found'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /prices:
+    get:
+      summary: 'Get price data (legacy redirect)'
+      description: |
+        **Deprecated.** Redirects to `/nps/prices` with the same query parameters.
+        Use `GET /nps/prices` instead.
+      deprecated: true
+      tags:
+        - Legacy
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: country
+          in: query
+          schema:
+            type: string
+            enum: [lt, ee, lv, fi]
+      responses:
+        '302':
+          description: 'Redirect to /nps/prices with preserved query string'
+  /settings:
+    get:
+      summary: 'Get application settings'
+      description: 'Returns key-value settings stored in the database.'
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: 'Settings object'
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '500':
+          description: 'Failed to fetch settings'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /settings/{key}:
+    put:
+      summary: 'Update a setting'
+      tags:
+        - Configuration
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  description: 'New value for the setting'
+      responses:
+        '200':
+          description: 'Setting updated'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: 'Missing value'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 'Failed to update setting'
           content:
             application/json:
               schema:
@@ -726,6 +832,166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /sync/historical:
+    post:
+      summary: 'Sync historical data for a date range'
+      tags:
+        - Sync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startDate, endDate]
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+                country:
+                  type: string
+                  enum: [lt, ee, lv, fi]
+                  default: lt
+      responses:
+        '200':
+          description: 'Historical sync completed'
+        '400':
+          description: 'Missing required parameters'
+        '500':
+          description: 'Historical sync failed'
+
+  /sync/year:
+    post:
+      summary: 'Sync all data for a specific year'
+      tags:
+        - Sync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year:
+                  type: integer
+                country:
+                  type: string
+                  enum: [lt, ee, lv, fi]
+                  default: lt
+      responses:
+        '200':
+          description: 'Year sync completed'
+        '400':
+          description: 'Missing year'
+        '500':
+          description: 'Year sync failed'
+
+  /sync/years:
+    post:
+      summary: 'Sync data for a range of years'
+      tags:
+        - Sync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startYear, endYear]
+              properties:
+                startYear:
+                  type: integer
+                endYear:
+                  type: integer
+                country:
+                  type: string
+                  enum: [lt, ee, lv, fi]
+                  default: lt
+      responses:
+        '200':
+          description: 'Year range sync completed'
+        '400':
+          description: 'Missing year range'
+        '500':
+          description: 'Year range sync failed'
+
+  /sync/all-historical:
+    post:
+      summary: 'Sync all historical data for one country'
+      description: 'Syncs from 2012-07-01 through today for the given country.'
+      tags:
+        - Sync
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country:
+                  type: string
+                  enum: [lt, ee, lv, fi]
+                  default: lt
+      responses:
+        '200':
+          description: 'All historical sync completed'
+        '500':
+          description: 'All historical sync failed'
+
+  /sync/efficient:
+    post:
+      summary: 'Efficient sync for all countries'
+      description: 'Runs an optimized multi-country sync using batched Elering API calls.'
+      tags:
+        - Sync
+      responses:
+        '200':
+          description: 'Efficient sync completed'
+        '500':
+          description: 'Efficient sync failed'
+
+  /sync/all-countries-historical:
+    post:
+      summary: 'Historical sync for all countries in parallel'
+      tags:
+        - Sync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startDate, endDate]
+              properties:
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: 'All countries historical sync completed'
+        '400':
+          description: 'Missing date range'
+        '500':
+          description: 'Sync failed'
+
+  /sync/all-countries-all-historical:
+    post:
+      summary: 'Full historical sync for all countries'
+      description: 'Syncs 2012-07-01 through today for LT, EE, LV, and FI in parallel.'
+      tags:
+        - Sync
+      responses:
+        '200':
+          description: 'Full historical sync completed'
+        '500':
+          description: 'Sync failed'
 
   /sync/reset-initial:
     post:
@@ -990,6 +1256,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /sync/date-complete/{date}:
+    get:
+      summary: 'Check data completeness for a date'
+      tags:
+        - Sync
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: 'Date completeness status'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        '400':
+          description: 'Invalid date format'
+        '500':
+          description: 'Failed to check completeness'
+
+  /sync/recent-completeness:
+    get:
+      summary: 'Check today and yesterday completeness'
+      tags:
+        - Sync
+      responses:
+        '200':
+          description: 'Recent completeness for today and yesterday'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      today:
+                        type: object
+                      yesterday:
+                        type: object
+                      needsSync:
+                        type: boolean
+        '500':
+          description: 'Failed to check recent completeness'
+
 components:
   schemas:
     Country:
@@ -1152,4 +1474,8 @@ tags:
   - name: Countries
     description: 'Country information endpoints' 
   - name: Configuration
-    description: 'Price configuration and tariff endpoints' 
+    description: 'Price configuration and tariff endpoints'
+  - name: Sync
+    description: 'Sync worker status and admin triggers'
+  - name: Legacy
+    description: 'Deprecated compatibility endpoints; prefer /nps/* equivalents'
