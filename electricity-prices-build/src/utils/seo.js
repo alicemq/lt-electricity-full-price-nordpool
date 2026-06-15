@@ -2,28 +2,45 @@
  * SEO utility functions for managing meta tags, structured data, and SEO-related content
  */
 
+const SUPPORTED_LOCALES = ['lt', 'en']
+
 /**
  * Get the base URL for the application
  * Uses environment variable, package.json homepage, or falls back to current origin
  */
-function getBaseUrl() {
-  // Try environment variable first
+export function getBaseUrl() {
   if (import.meta.env.VITE_BASE_URL) {
     return import.meta.env.VITE_BASE_URL
   }
-  
-  // Try package.json homepage (set during build)
+
   if (import.meta.env.VITE_HOMEPAGE) {
     return import.meta.env.VITE_HOMEPAGE
   }
-  
-  // Fall back to current origin (works in browser)
+
   if (typeof window !== 'undefined') {
     return window.location.origin
   }
-  
-  // Last resort: return empty string (relative URLs)
+
   return ''
+}
+
+/**
+ * Build absolute page URL with optional locale query for hreflang alternates.
+ * Lithuanian is the default locale and uses the canonical path without ?lang=.
+ */
+export function buildLocalizedUrl(path, locale = 'lt') {
+  const baseUrl = getBaseUrl()
+  const [pathname, search = ''] = path.split('?')
+  const params = new URLSearchParams(search)
+
+  if (locale === 'en') {
+    params.set('lang', 'en')
+  } else {
+    params.delete('lang')
+  }
+
+  const query = params.toString()
+  return `${baseUrl}${pathname}${query ? `?${query}` : ''}`
 }
 
 /**
@@ -31,14 +48,36 @@ function getBaseUrl() {
  */
 function setMetaTag(name, content, attribute = 'name') {
   let element = document.querySelector(`meta[${attribute}="${name}"]`)
-  
+
   if (!element) {
     element = document.createElement('meta')
     element.setAttribute(attribute, name)
     document.head.appendChild(element)
   }
-  
+
   element.setAttribute('content', content)
+}
+
+/**
+ * Update hreflang alternate links for supported locales.
+ * Uses ?lang=en for English; Lithuanian remains the canonical default URL.
+ */
+export function setHreflang(path) {
+  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((el) => el.remove())
+
+  const alternates = [
+    { hreflang: 'lt', href: buildLocalizedUrl(path, 'lt') },
+    { hreflang: 'en', href: buildLocalizedUrl(path, 'en') },
+    { hreflang: 'x-default', href: buildLocalizedUrl(path, 'lt') },
+  ]
+
+  alternates.forEach(({ hreflang, href }) => {
+    const link = document.createElement('link')
+    link.rel = 'alternate'
+    link.hreflang = hreflang
+    link.href = href
+    document.head.appendChild(link)
+  })
 }
 
 /**
@@ -58,7 +97,7 @@ export function setDescription(description) {
 /**
  * Update Open Graph meta tags
  */
-export function setOpenGraph({ title, description, image, url, type = 'website' }) {
+export function setOpenGraph({ title, description, image, url, type = 'website', locale = 'lt' }) {
   setMetaTag('og:title', title, 'property')
   setMetaTag('og:description', description, 'property')
   setMetaTag('og:type', type, 'property')
@@ -67,7 +106,7 @@ export function setOpenGraph({ title, description, image, url, type = 'website' 
     setMetaTag('og:image', image, 'property')
   }
   setMetaTag('og:site_name', 'Elektros kaina LT', 'property')
-  setMetaTag('og:locale', 'lt_LT', 'property')
+  setMetaTag('og:locale', locale === 'en' ? 'en_US' : 'lt_LT', 'property')
 }
 
 /**
@@ -87,13 +126,13 @@ export function setTwitterCard({ title, description, image }) {
  */
 export function setCanonical(url) {
   let element = document.querySelector('link[rel="canonical"]')
-  
+
   if (!element) {
     element = document.createElement('link')
     element.setAttribute('rel', 'canonical')
     document.head.appendChild(element)
   }
-  
+
   element.setAttribute('href', url)
 }
 
@@ -109,15 +148,12 @@ export function setLanguage(locale) {
  * Supports both single objects and arrays for multiple structured data items
  */
 export function setStructuredData(data) {
-  // Remove existing structured data scripts
   const existing = document.querySelectorAll('script[type="application/ld+json"]')
-  existing.forEach(el => el.remove())
-  
-  // Handle both arrays and single objects
+  existing.forEach((el) => el.remove())
+
   const dataArray = Array.isArray(data) ? data : [data]
-  
-  // Add each structured data item
-  dataArray.forEach(item => {
+
+  dataArray.forEach((item) => {
     const script = document.createElement('script')
     script.type = 'application/ld+json'
     script.textContent = JSON.stringify(item)
@@ -126,29 +162,65 @@ export function setStructuredData(data) {
 }
 
 /**
+ * Build breadcrumb items for a route
+ */
+export function getRouteBreadcrumbItems(route, locale = 'lt') {
+  const baseUrl = getBaseUrl()
+  const homeLabel = locale === 'lt' ? 'Pradžia' : 'Home'
+  const items = [{ name: homeLabel, url: baseUrl }]
+
+  const path = route.path
+  if (path === '/' || path === '/upcoming') {
+    return items
+  }
+
+  const title = route.meta?.title?.[locale] || route.meta?.title || route.name
+  if (title) {
+    items.push({ name: title, url: `${baseUrl}${route.fullPath}` })
+  }
+
+  return items
+}
+
+/**
+ * Build default structured data bundle for a route
+ */
+export function buildRouteStructuredData(route, locale = 'lt', extraItems = []) {
+  const breadcrumb = generateBreadcrumbStructuredData(getRouteBreadcrumbItems(route, locale))
+  return [
+    generateWebsiteStructuredData(),
+    generateOrganizationStructuredData(),
+    breadcrumb,
+    ...extraItems,
+  ]
+}
+
+/**
  * Set comprehensive SEO meta tags for a page
  */
-export function setSEO({ 
-  title, 
-  description, 
+export function setSEO({
+  title,
+  description,
   image,
   url,
   type = 'website',
   locale = 'lt',
-  structuredData
+  structuredData,
 }) {
   const baseUrl = getBaseUrl()
   const defaultImage = image || `${baseUrl}/android-chrome-512x512.png`
   const fullTitle = title ? `${title} | Elektros kaina LT su mokesčiais` : 'Elektros kaina LT su mokesčiais'
-  const fullUrl = url ? `${baseUrl}${url}` : (typeof window !== 'undefined' ? window.location.href : baseUrl)
-  
+  const path = url || (typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/')
+  const fullUrl = path.startsWith('http') ? path : `${baseUrl}${path}`
+
   setTitle(fullTitle)
   setDescription(description)
-  setCanonical(fullUrl)
+  setCanonical(buildLocalizedUrl(path, locale))
   setLanguage(locale)
-  setOpenGraph({ title: fullTitle, description, image: defaultImage, url: fullUrl, type })
+  setHreflang(path)
+  setOpenGraph({ title: fullTitle, description, image: defaultImage, url: fullUrl, type, locale })
   setTwitterCard({ title: fullTitle, description, image: defaultImage })
-  
+
   if (structuredData) {
     setStructuredData(structuredData)
   }
@@ -156,7 +228,6 @@ export function setSEO({
 
 /**
  * Generate structured data for the electricity price website
- * Optimized for Google Rich Results
  */
 export function generateWebsiteStructuredData() {
   const baseUrl = getBaseUrl()
@@ -175,22 +246,22 @@ export function generateWebsiteStructuredData() {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'EUR',
-      availability: 'https://schema.org/InStock'
+      availability: 'https://schema.org/InStock',
     },
     publisher: {
       '@type': 'Organization',
       name: 'Elektros kaina LT',
-      url: baseUrl
+      url: baseUrl,
     },
-    inLanguage: ['lt', 'en'],
+    inLanguage: SUPPORTED_LOCALES,
     potentialAction: {
       '@type': 'SearchAction',
       target: {
         '@type': 'EntryPoint',
-        urlTemplate: `${baseUrl}/today?date={search_term_string}`
+        urlTemplate: `${baseUrl}/today?date={search_term_string}`,
       },
-      'query-input': 'required name=search_term_string'
-    }
+      'query-input': 'required name=search_term_string',
+    },
   }
 }
 
@@ -207,7 +278,7 @@ export function generateOrganizationStructuredData() {
     url: baseUrl,
     logo: `${baseUrl}/android-chrome-512x512.png`,
     sameAs: [],
-    description: 'Nord Pool elektros kainų rodymo sistema su visais mokesčiais'
+    description: 'Nord Pool elektros kainų rodymo sistema su visais mokesčiais',
   }
 }
 
@@ -222,55 +293,84 @@ export function generateBreadcrumbStructuredData(items) {
       '@type': 'ListItem',
       position: index + 1,
       name: item.name,
-      item: item.url
-    }))
+      item: item.url,
+    })),
   }
 }
 
+const COUNTRY_NAMES = {
+  LT: 'Lithuania',
+  EE: 'Estonia',
+  LV: 'Latvia',
+  FI: 'Finland',
+}
+
 /**
- * Generate structured data for a price data page
- * Optimized for Google Dataset Rich Results
+ * Generate structured data for a price data page (valid Dataset schema)
  */
 export function generatePriceDataStructuredData({ date, averagePrice, country = 'LT', minPrice, maxPrice }) {
   const baseUrl = getBaseUrl()
+  const countryName = COUNTRY_NAMES[country] || country
+  const pageUrl = `${baseUrl}/today?date=${date}`
+
+  const variableMeasured = []
+  if (averagePrice != null) {
+    variableMeasured.push({
+      '@type': 'PropertyValue',
+      name: 'average electricity price',
+      value: Number(averagePrice.toFixed(2)),
+      unitText: 'ct/kWh',
+    })
+  }
+  if (minPrice != null) {
+    variableMeasured.push({
+      '@type': 'PropertyValue',
+      name: 'minimum electricity price',
+      value: Number(minPrice.toFixed(2)),
+      unitText: 'ct/kWh',
+    })
+  }
+  if (maxPrice != null) {
+    variableMeasured.push({
+      '@type': 'PropertyValue',
+      name: 'maximum electricity price',
+      value: Number(maxPrice.toFixed(2)),
+      unitText: 'ct/kWh',
+    })
+  }
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Dataset',
     name: `Elektros kainos ${date} - ${country}`,
-    description: `Nord Pool elektros kainos ${date} su visais mokesčiais. Vidutinė kaina: ${averagePrice} ct/kWh`,
-    url: `${baseUrl}/today?date=${date}`,
+    description: `Nord Pool elektros kainos ${date} su visais mokesčiais${averagePrice != null ? `. Vidutinė kaina: ${averagePrice.toFixed(2)} ct/kWh` : ''}.`,
+    url: pageUrl,
+    identifier: `${country}-${date}`,
     datePublished: date,
-    dateModified: new Date().toISOString(),
+    dateModified: new Date().toISOString().split('T')[0],
     temporalCoverage: date,
     spatialCoverage: {
-      '@type': 'Country',
-      name: country === 'LT' ? 'Lithuania' : country === 'EE' ? 'Estonia' : country === 'LV' ? 'Latvia' : 'Finland'
+      '@type': 'Place',
+      name: countryName,
     },
     creator: {
       '@type': 'Organization',
       name: 'Nord Pool',
-      url: 'https://www.nordpoolgroup.com'
+      url: 'https://www.nordpoolgroup.com',
     },
     publisher: {
       '@type': 'Organization',
       name: 'Elektros kaina LT',
-      url: baseUrl
+      url: baseUrl,
     },
     distribution: {
       '@type': 'DataDownload',
       encodingFormat: 'application/json',
-      contentUrl: `${baseUrl}/api/v1/nps/prices/${date}`
+      contentUrl: `${baseUrl}/api/v1/nps/prices?date=${date}&country=${country}`,
     },
-    ...(averagePrice && {
-      aggregateRating: {
-        '@type': 'AggregateRating',
-        ratingValue: averagePrice,
-        bestRating: maxPrice || averagePrice * 1.5,
-        worstRating: minPrice || averagePrice * 0.5
-      }
-    }),
-    keywords: 'elektros kaina, electricity prices, Nord Pool, Lithuania, energy market',
-    inLanguage: 'lt'
+    ...(variableMeasured.length > 0 ? { variableMeasured } : {}),
+    keywords: ['elektros kaina', 'electricity prices', 'Nord Pool', countryName, 'energy market'],
+    inLanguage: ['lt', 'en'],
+    isAccessibleForFree: true,
   }
 }
-

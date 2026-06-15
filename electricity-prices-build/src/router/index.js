@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import TodayView from '../views/TodayView.vue'
 import UpcomingPrices from '../components/UpcomingPrices.vue'
-import { setSEO, generateWebsiteStructuredData, generateOrganizationStructuredData } from '../utils/seo'
+import { setSEO, buildRouteStructuredData } from '../utils/seo'
 import i18n from '../i18n'
 
 const router = createRouter({
@@ -117,8 +117,14 @@ const router = createRouter({
   ]
 })
 
-// Navigation guard to update SEO meta tags
+// Navigation guard to update SEO meta tags and sync locale from ?lang= query
 router.beforeEach((to, from, next) => {
+  const queryLang = typeof to.query.lang === 'string' ? to.query.lang : null
+  if (queryLang === 'en' || queryLang === 'lt') {
+    i18n.global.locale.value = queryLang
+    localStorage.setItem('locale', queryLang)
+  }
+
   const locale = i18n.global.locale.value || 'lt'
   const meta = to.meta || {}
   
@@ -128,19 +134,12 @@ router.beforeEach((to, from, next) => {
       ? 'Rodykite Nord Pool elektros kainas su visais taikomais mokesčiais ir prievolėmis. Kainos atnaujinamos automatiškai.'
       : 'Display Nord Pool electricity prices with all applicable taxes and fees. Prices are updated automatically.')
   
-  // Generate multiple structured data items for Google
-  const websiteData = generateWebsiteStructuredData()
-  const organizationData = generateOrganizationStructuredData()
-  
-  // Combine structured data
-  const combinedStructuredData = [websiteData, organizationData]
-  
   setSEO({
     title,
     description,
     url: to.fullPath,
     locale,
-    structuredData: combinedStructuredData
+    structuredData: buildRouteStructuredData(to, locale),
   })
   
   next()
