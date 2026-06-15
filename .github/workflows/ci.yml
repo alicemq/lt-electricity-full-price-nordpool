@@ -87,8 +87,11 @@ jobs:
       - name: OpenAPI route parity check
         run: node bin/validate-openapi-routes.js
 
-      - name: OpenAPI Spectral lint (UA3 baseline)
+      - name: OpenAPI Spectral lint (UA3 spectral:oas)
         run: npx --yes @stoplight/spectral-cli@6.15.0 lint swagger-ui/openapi.yaml
+
+      - name: OpenAPI contract sample tests
+        run: node --test tests/contract/openapi-samples.test.js
 
       - name: Warn if vendor/flows is behind origin/main
         env:
