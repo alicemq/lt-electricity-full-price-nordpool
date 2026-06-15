@@ -18,7 +18,10 @@ const messages = {
       invalidBody: 'This shared layout link is missing or could not be decoded. Ask the sender for a new link.',
       loading: 'Loading display...',
       error: 'Failed to load prices for this display.',
-      empty: 'No price data available for this display.'
+      empty: 'No price data available for this display.',
+      copyLink: 'Copy share link',
+      copied: 'Copied!',
+      copyFailed: 'Could not copy link'
     },
     upcoming: {
       title: 'Upcoming Prices',
@@ -162,7 +165,10 @@ const messages = {
       invalidBody: 'Bendrinamos išdėstymo nuorodos trūksta arba jos nepavyko iššifruoti. Paprašykite naujos nuorodos.',
       loading: 'Kraunamas rodinys...',
       error: 'Nepavyko įkelti kainų šiam rodiniui.',
-      empty: 'Šiam rodiniui kainų duomenų nėra.'
+      empty: 'Šiam rodiniui kainų duomenų nėra.',
+      copyLink: 'Kopijuoti nuorodą',
+      copied: 'Nukopijuota!',
+      copyFailed: 'Nepavyko nukopijuoti nuorodos'
     },
     upcoming: {
       title: 'Artimiausios kainos',

@@ -126,3 +126,50 @@ export function defaultLayoutConfig() {
     tz: DEFAULT_TZ,
   };
 }
+
+/**
+ * @param {LayoutConfigV1} config
+ * @returns {string}
+ */
+export function exportLayoutJson(config) {
+  const normalized = normalizeLayoutConfig(config);
+  if (!normalized) {
+    throw new Error('Invalid layout config');
+  }
+  return JSON.stringify(normalized, null, 2);
+}
+
+/**
+ * @param {string} jsonString
+ * @returns {{ ok: true, config: LayoutConfigV1 } | { ok: false, error: string }}
+ */
+export function importLayoutJson(jsonString) {
+  if (typeof jsonString !== 'string' || jsonString.trim().length === 0) {
+    return { ok: false, error: 'missing' };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonString);
+    const config = normalizeLayoutConfig(parsed);
+    if (!config) {
+      return { ok: false, error: 'invalid' };
+    }
+    return { ok: true, config };
+  } catch {
+    return { ok: false, error: 'invalid' };
+  }
+}
+
+/**
+ * Build an absolute share URL for the current origin.
+ * @param {LayoutConfigV1} config
+ * @param {string} [basePath='/display']
+ * @returns {string}
+ */
+export function buildShareUrl(config, basePath = '/display') {
+  const relative = buildDisplayUrl(config, basePath);
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${relative}`;
+  }
+  return relative;
+}
