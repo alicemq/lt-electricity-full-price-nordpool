@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@vuepic/vue-datepicker": "11.0.2",
-    "@vueuse/core": "13.4.0",
+    "@vueuse/core": "14.3.0",
     "axios": "1.18.0",
     "bootstrap": "5.3.8",
     "bootswatch": "5.3.8",
