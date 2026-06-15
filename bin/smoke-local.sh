@@ -34,8 +34,7 @@ test -f .env.example
 if command -v npm >/dev/null 2>&1; then
   echo "==> frontend build"
   npm ci --prefix electricity-prices-build
-  # npx resolves local vite on Windows where bare "vite" is not on PATH in npm scripts
-  npm exec --prefix electricity-prices-build -- vite build
+  npm run build --prefix electricity-prices-build
 fi
 
 if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
