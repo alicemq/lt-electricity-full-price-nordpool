@@ -1,7 +1,10 @@
 # Electricity Prices NordPool - Project Documentation
 
-## 🎉 **MIGRATION COMPLETED SUCCESSFULLY**
+> **Governance and revamp decisions:** see [docs/PROJECT-GOVERNANCE.md](../docs/PROJECT-GOVERNANCE.md).  
+> **For operators:** [README.md](../README.md). **For agents:** [AGENTS.md](../AGENTS.md).  
+> This file is **historical** (2024 migration record), not the source of rules or backlog priorities.
 
+## 🎉 **MIGRATION COMPLETED SUCCESSFULLY**
 **Status**: ✅ **PRODUCTION READY** - All core infrastructure implemented and operational with secure architecture
 
 ## 📊 **Current System Overview**
