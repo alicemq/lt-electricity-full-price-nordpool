@@ -16,6 +16,7 @@ test.describe('API contracts', () => {
     const response = await request.get(`${apiBase}/api/v1/health`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.status).toBeTruthy();
+    expect(body.success).toBe(true);
+    expect(body.overallStatus).toBeTruthy();
   });
 });
