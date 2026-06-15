@@ -94,6 +94,7 @@ vendor/flows/                   # Read-only flows reference on main (submodule; 
 | Endpoint | Auth | Notes |
 | --- | --- | --- |
 | `GET /health` | None | Liveness (also `/api/v1/health`) |
+| `GET /ready` | None | Readiness: Postgres + 24h price freshness (also `/api/v1/ready`) |
 | `GET /api/v1/nps/prices/...` | None | Price data |
 | `GET /api/sync/status` | None | Sync worker status |
 | Swagger | None | `/api/` via frontend proxy |
