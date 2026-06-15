@@ -10,4 +10,4 @@ This directory is tracked via Git LFS. The snapshot file is not committed until 
 
 **Capture:** `./bin/capture-db-lfs.sh`
 
-**Restore (local dev):** see [docs/ops/db-backup-lfs.md](../docs/ops/db-backup-lfs.md)
+**Restore (local dev):** `./bin/restore-db-lfs.sh --fresh-volume` — see [docs/ops/backup-restore.md](../docs/ops/backup-restore.md)

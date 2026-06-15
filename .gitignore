@@ -46,6 +46,9 @@ data/db-backup/*.partial
 data/db-backup/*.tmp
 data/db-backup/*.sql.gz.tmp
 
+# Host Postgres backups (server-backup.sh output)
+backups/
+
 # Legacy paths (kept for compatibility)
 /electricity-prices
 /index.js

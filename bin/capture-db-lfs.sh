@@ -153,7 +153,8 @@ Verify:
   git lfs ls-files
   git lfs track
 
-Restore locally: docs/ops/db-backup-lfs.md
+Restore locally: ./bin/restore-db-lfs.sh --fresh-volume
+See: docs/ops/backup-restore.md
 EOF
 }
 
