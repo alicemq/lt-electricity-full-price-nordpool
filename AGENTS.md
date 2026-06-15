@@ -41,7 +41,7 @@ Containerized electricity price monitor with Elering/NordPool sync, multi-countr
 ## Stack
 
 - **Runtime:** Node.js 20, Express 4.18 (`backend/`)
-- **Database:** PostgreSQL 17 (`database/init/`, `database/migrations/`)
+- **Database:** PostgreSQL 17 (`database/init/` — single init schema, no incremental migrations)
 - **Frontend:** Vue 3.5 + Vite 7 + Pinia (`electricity-prices-build/`)
 - **Sync:** Cron inside backend container (`backend/src/syncWorker.js`) — do not refactor in foundation PRs
 - **Deploy:** Coolify (Docker Compose); see `COOLIFY_DEPLOYMENT.md`
@@ -53,8 +53,7 @@ backend/src/           # Express API, sync worker, CLI
 backend/src/v1.js      # v1 price routes (large — split planned UA5)
 electricity-prices-build/src/   # Vue SPA
 swagger-ui/openapi.yaml         # OpenAPI source of truth (UA3 will consolidate duplicates)
-database/init/                  # Schema bootstrap
-database/migrations/            # Numbered SQL migrations
+database/init/                  # Schema bootstrap (single source of truth)
 ```
 
 **Do not modify in foundation/revamp phases unless explicitly scoped:**

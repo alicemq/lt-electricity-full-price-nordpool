@@ -682,19 +682,6 @@ const server = app.listen(PORT, async () => {
     // Continue anyway - might already be initialized
   }
   
-  // Run database migrations
-  console.log('[CONTAINER WAKE-UP] About to run database migrations...');
-  try {
-    const { runMigrations } = await import('./migrations.js');
-    await runMigrations();
-    console.log('[CONTAINER WAKE-UP] Database migrations completed.');
-  } catch (error) {
-    console.error('[CONTAINER WAKE-UP] ✗ Failed to run migrations:');
-    console.error('[CONTAINER WAKE-UP] Error:', error.message);
-    console.error('[CONTAINER WAKE-UP] Stack:', error.stack);
-    // Continue anyway - migrations might have been applied manually
-  }
-  
   // Start the sync worker after server is ready
   try {
     console.log('[CONTAINER WAKE-UP] Starting sync worker...');
