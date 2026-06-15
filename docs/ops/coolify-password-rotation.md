@@ -7,13 +7,26 @@ Operator runbook for rotating `POSTGRES_PASSWORD` after `.env*` untrack (issue #
 - Production `POSTGRES_PASSWORD` may still match the old dev default (`electricity_password`) that was once tracked in git history.
 - Rotate if production reused compose defaults or if credential exposure is suspected.
 
-## Preconditions
+## Local development (agent-completable)
+
+Local stacks no longer fall back to `electricity_password` in `docker-compose.yml`. `./scripts/dev.sh` seeds `.env.development` and `deploy/local.env` from examples and generates a strong random `POSTGRES_PASSWORD` when the placeholder is `CHANGE_ME`. Those files are gitignored.
+
+If Postgres was initialized with the old default, reset the dev volume before restarting:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+./scripts/dev.sh
+```
+
+## Production rotation (operator-only)
+
+### Preconditions
 
 - Coolify UI access at your deployment host (see [COOLIFY_DEPLOYMENT.md](../../COOLIFY_DEPLOYMENT.md)).
 - Maintenance window: backend will restart; brief API unavailability is expected.
 - New password chosen (strong, unique; store in a password manager).
 
-## Rotation steps
+### Rotation steps
 
 1. **Confirm current state** — In Coolify → application → Environment Variables, check whether `POSTGRES_PASSWORD` matches the historical dev default. Do not paste values into tickets or this repo.
 
@@ -42,7 +55,8 @@ Operator runbook for rotating `POSTGRES_PASSWORD` after `.env*` untrack (issue #
    - Date (UTC)
    - Operator initials
    - Confirmation that prod no longer uses the dev default
-   - Close GitHub issue #34
+
+Local dev acceptance is complete when `./scripts/dev.sh` generates non-default credentials; production rotation closes #34 when an operator confirms Coolify no longer uses the historical default.
 
 ## Rollback
 

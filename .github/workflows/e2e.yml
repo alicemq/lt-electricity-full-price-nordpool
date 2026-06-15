@@ -25,6 +25,7 @@ jobs:
       - name: Start dev stack
         env:
           POSTGRES_PASSWORD: ci_password_change_me
+          DATABASE_URL: postgresql://electricity_user:ci_password_change_me@db:5432/electricity_prices
           NODE_ENV: development
         run: |
           cp -n deploy/local.env.example deploy/local.env 2>/dev/null || true

@@ -3,12 +3,26 @@
 # Development startup script
 echo "🚀 Starting Electricity Prices in Development Mode..."
 
-# Local env files are gitignored — seed from .env.example on first run
+# Local env files are gitignored — seed from examples on first run
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/lib/ensure-local-secrets.sh"
+
 ENV_FILE=".env.development"
 if [ ! -f "$ENV_FILE" ]; then
   cp .env.example "$ENV_FILE"
-  echo "Created $ENV_FILE from .env.example — review values before use."
+  echo "Created $ENV_FILE from .env.example."
 fi
+ensure_postgres_secrets_in_file "$ENV_FILE" || true
+
+LOCAL_ENV_FILE="deploy/local.env"
+if [ ! -f "$LOCAL_ENV_FILE" ]; then
+  cp deploy/local.env.example "$LOCAL_ENV_FILE"
+  echo "Created $LOCAL_ENV_FILE from deploy/local.env.example."
+fi
+ensure_postgres_secrets_in_file "$LOCAL_ENV_FILE" || true
+sync_postgres_password_between_files "$ENV_FILE" "$LOCAL_ENV_FILE" || true
+
 cp "$ENV_FILE" .env
 
 # Build and start services with development override
