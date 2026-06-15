@@ -131,6 +131,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ready:
+    get:
+      operationId: getReady
+      summary: Readiness probe
+      description: |
+        Returns 200 when Postgres is reachable and at least one country has price data within 24 hours.
+        Returns 503 otherwise. See docs/ops/ready-slo.md.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service ready for traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status:
+                    type: string
+                    enum: [ready]
+                  checks:
+                    type: object
+                    properties:
+                      postgres:
+                        type: boolean
+                      price_data_fresh:
+                        type: boolean
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status:
+                    type: string
+                    enum: [not_ready]
+                  checks:
+                    type: object
+                    properties:
+                      postgres:
+                        type: boolean
+                      price_data_fresh:
+                        type: boolean
   /countries:
     get:
       summary: Get available countries

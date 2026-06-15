@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import moment from 'moment-timezone';
 import { getDatabaseStats, getSystemHealth } from './database.js';
 import { buildHealthResponse } from './lib/healthResponse.js';
+import { buildReadyResponse } from './lib/readyChecks.js';
 import v1Router from './v1.js';
 import { legacyApiShim } from './legacyApi.js';
 import { startSyncWorker, stopSyncWorker, getSyncStatus } from './syncWorker.js';
@@ -65,6 +66,20 @@ app.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       overallStatus: 'degraded',
       issues: ['Failed to get health status'],
+    });
+  }
+});
+
+app.get('/ready', async (req, res) => {
+  try {
+    const payload = await buildReadyResponse();
+    res.status(payload.status === 'ready' ? 200 : 503).json(payload);
+  } catch (error) {
+    console.error('Error getting readiness status:', error);
+    res.status(503).json({
+      status: 'not_ready',
+      checks: { postgres: false, price_data_fresh: false },
+      error: error.message,
     });
   }
 });
