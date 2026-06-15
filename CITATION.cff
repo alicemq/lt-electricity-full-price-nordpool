@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: "Electricity Prices NordPool"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: Alice
+    family-names: MQ
+    email: zmarkeviciai@gmail.com
+repository-code: "https://github.com/alicemq/lt-electricity-full-price-nordpool"
+url: "https://github.com/alicemq/lt-electricity-full-price-nordpool"
+license: AGPL-3.0-only
+keywords:
+  - electricity
+  - nordpool
+  - baltic
+  - energy-prices
+  - postgresql
+  - vue
