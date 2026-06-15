@@ -105,12 +105,27 @@ export function getSyncPollIntervalMs(now = moment()) {
 }
 
 /**
+ * Whether the requested date is the current calendar day in Vilnius.
+ * @param {Date|string|import('moment').Moment} date
+ * @param {import('moment').Moment} [now]
+ */
+export function isCurrentDisplayDay(date, now = moment()) {
+  const nowVilnius = now.clone().tz(DISPLAY_TIMEZONE);
+  return moment(date).tz(DISPLAY_TIMEZONE).isSame(nowVilnius, 'day');
+}
+
+/**
  * Whether a network fetch for today/future data is allowed in the current phase.
  * Historical dates are always allowed via {@link isHistoricalDate}.
+ * Today's prices were published in a prior release window and are always fetchable.
  * @param {Date|string|import('moment').Moment} date
  * @param {import('moment').Moment} [now]
  */
 export function shouldFetchFutureData(date, now = moment()) {
+  if (isCurrentDisplayDay(date, now)) {
+    return true;
+  }
+
   const phase = getReleasePhase(now);
   if (phase === RELEASE_PHASE.DURING) {
     return true;
