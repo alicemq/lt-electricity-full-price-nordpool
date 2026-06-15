@@ -127,6 +127,8 @@ VAPID_PRIVATE_KEY=your_vapid_private_key
 VAPID_SUBJECT=mailto:ops@yourdomain.com
 ```
 
+See [docs/ops/push-admin.md](docs/ops/push-admin.md) for operator curl examples and export notes.
+
 **Important Notes**:
 - **Replace `your_secure_password_here`** with a strong, unique password
 - Use the **same password** for both `POSTGRES_PASSWORD` and in `DATABASE_URL`
