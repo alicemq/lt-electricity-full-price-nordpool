@@ -63,6 +63,24 @@ test.describe('frontend smoke', () => {
     await expect(page.getByLabel('Pigi kaina')).toBeVisible({ timeout: 20_000 });
   });
 
+  test('bottom navigation opens settings after today then upcoming', async ({ page }) => {
+    await page.goto('/upcoming?lang=lt');
+    const nav = page.locator('nav.bottom-menu');
+
+    await nav.getByRole('button', { name: 'Šiandien' }).click();
+    await expect(page).toHaveURL(/\/today/);
+    await expect(page.locator('.today-page')).toBeVisible();
+
+    await nav.getByRole('button', { name: 'Artimiausios' }).click();
+    await expect(page).toHaveURL(/\/upcoming/);
+    await expect(page.locator('.today-page')).toHaveCount(0);
+
+    await nav.getByRole('button', { name: 'Nustatymai' }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.locator('.today-page')).toHaveCount(0);
+    await expect(page.getByLabel('Pigi kaina')).toBeVisible({ timeout: 20_000 });
+  });
+
   test('API health via frontend proxy', async ({ request }) => {
     const response = await request.get('/api/v1/health');
     expect(response.ok()).toBeTruthy();

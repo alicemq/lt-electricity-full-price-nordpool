@@ -27,7 +27,7 @@ onUnmounted(() => {
 
 <template>
   <div class="app-container" :class="{ 'app-container--kiosk': !showBottomMenu }">
-    <RouterView />
+    <RouterView :key="route.fullPath" />
   </div>
   <BottomMenu v-if="showBottomMenu" />
 </template>
