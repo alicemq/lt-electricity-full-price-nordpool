@@ -2,6 +2,8 @@
 
 **Source of truth:** `openapi.yaml`. Edit YAML only.
 
+**Lint:** CI runs Spectral baseline rules (`.spectral.yaml`). Full `spectral:oas` extend is tracked in #101.
+
 **Derived copy:** `openapi.json` is generated from YAML. Regenerate after YAML changes:
 
 ```bash

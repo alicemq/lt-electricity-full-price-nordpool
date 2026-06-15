@@ -4,7 +4,9 @@
 
 The Electricity Prices NordPool API provides access to electricity price data for Baltic countries (Lithuania, Estonia, Latvia, Finland) with comprehensive sync management capabilities.
 
-**OpenAPI source of truth:** `swagger-ui/openapi.yaml` (JSON generated in CI). Interactive docs: `/api/` via the frontend proxy.
+**OpenAPI source of truth:** `swagger-ui/openapi.yaml` (JSON generated in CI). Interactive docs: `/api/` via the frontend proxy (`/docs` redirects to `/api/` in nginx and Vite dev).
+
+**Contract lint:** CI runs Spectral baseline rules (`.spectral.yaml`); expand toward full `spectral:oas` in UA3 follow-ups.
 
 **Legacy compatibility:** Unversioned `/api/*` paths forward to `/api/v1/*` with deprecation headers. See [legacy-api.md](./legacy-api.md).
 
