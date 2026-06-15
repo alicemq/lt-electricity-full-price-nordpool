@@ -438,3 +438,40 @@ INSERT INTO cron_schedules (job_key, name, cron_expression, timezone, descriptio
 ('next_day_sync', 'Next Day Sync', '30 13 * * *', 'Europe/Paris', 'Every day at 13:30 Paris time after Nord Pool publish window', true),
 ('daily_sync', 'Daily Release Window Sync', 'dynamic', 'Europe/Paris', 'Dynamic scheduler during Nord Pool release window (read-only)', false)
 ON CONFLICT (job_key) DO NOTHING;
+
+-- Web Push subscriptions (optional PWA feature)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    payload_json JSONB NOT NULL DEFAULT '{}',
+    manage_token_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_error TEXT,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active ON push_subscriptions (active);
+
+CREATE TABLE IF NOT EXISTS push_sent_log (
+    id BIGSERIAL PRIMARY KEY,
+    sub_id TEXT NOT NULL REFERENCES push_subscriptions (id),
+    dedupe_key TEXT NOT NULL,
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (sub_id, dedupe_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_sent_log_sent_at ON push_sent_log (sent_at DESC);
+
+CREATE TABLE IF NOT EXISTS push_delivery_failures (
+    id BIGSERIAL PRIMARY KEY,
+    sub_id TEXT NOT NULL REFERENCES push_subscriptions (id),
+    dedupe_key TEXT,
+    error_message TEXT NOT NULL,
+    payload_json JSONB,
+    failed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_delivery_failures_failed_at ON push_delivery_failures (failed_at DESC);

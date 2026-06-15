@@ -23,6 +23,8 @@ import {
   parseAllowBackupFlag,
   resolveBackupFetchPlan,
 } from './lib/prices/backupFetchPolicy.js';
+import { hashManageToken, createManageToken } from './push/tokens.js';
+import { getVapidConfig, isPushConfigured } from './push/vapid.js';
 
 let passed = 0;
 let failed = 0;
@@ -200,6 +202,32 @@ await testAsync('withBackupFetchGuard rate-limits duplicate keys', async () => {
   const second = await withBackupFetchGuard(key, async () => 'again');
   assert.equal(second.status, 'rate_limited');
   resetBackupFetchGuard();
+});
+
+test('push manage token hash is deterministic', () => {
+  const token = 'abc123';
+  assert.equal(hashManageToken(token), hashManageToken(token));
+  assert.notEqual(hashManageToken(token), hashManageToken('other'));
+});
+
+test('createManageToken returns hex string', () => {
+  const token = createManageToken();
+  assert.match(token, /^[0-9a-f]{48}$/);
+});
+
+test('isPushConfigured is false without VAPID env', () => {
+  const prevPublic = process.env.VAPID_PUBLIC_KEY;
+  const prevPrivate = process.env.VAPID_PRIVATE_KEY;
+  delete process.env.VAPID_PUBLIC_KEY;
+  delete process.env.VAPID_PRIVATE_KEY;
+  assert.equal(isPushConfigured(), false);
+  if (prevPublic) process.env.VAPID_PUBLIC_KEY = prevPublic;
+  if (prevPrivate) process.env.VAPID_PRIVATE_KEY = prevPrivate;
+});
+
+test('getVapidConfig defaults subject', () => {
+  const config = getVapidConfig();
+  assert.equal(config.subject, 'mailto:ops@example.com');
 });
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);

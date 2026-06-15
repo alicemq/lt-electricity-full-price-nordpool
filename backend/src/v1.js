@@ -20,8 +20,13 @@ import {
 } from './lib/admin/cronSchedules.js';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getLatestTimestamp, logSync, getAllEarliestTimestamps, getInitialSyncStatus, getDatabaseStats, getSystemHealth, getAllCountrySyncStatus } from './database.js';
 import pool from './database.js';
+import { createPushRouter } from './push/router.js';
+import { createPushAdminRouter } from './push/adminRouter.js';
 
 const router = express.Router();
+
+router.use('/push', createPushRouter({ pool }));
+router.use('/admin/push', requireAdminToken, createPushAdminRouter({ pool }));
 
 // Get available countries
 router.get('/countries', async (req, res) => {
