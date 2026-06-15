@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Validate Docker Compose
         run: |
@@ -72,14 +70,23 @@ jobs:
         run: node bin/openapi-json-from-yaml.js --check
 
       - name: Warn if vendor/flows is behind origin/main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git -C vendor/flows fetch origin main
-          LOCAL=$(git -C vendor/flows rev-parse HEAD)
-          REMOTE=$(git -C vendor/flows rev-parse origin/main)
+          LOCAL=$(git ls-tree HEAD vendor/flows | awk '{print $3}')
+          if [ -z "$LOCAL" ]; then
+            echo "No vendor/flows gitlink; skipping freshness check"
+            exit 0
+          fi
+          REMOTE=$(gh api repos/alicemq/flows/commits/main --jq .sha 2>/dev/null || true)
+          if [ -z "$REMOTE" ]; then
+            echo "Could not resolve alicemq/flows main; skipping freshness check"
+            exit 0
+          fi
           if [ "$LOCAL" != "$REMOTE" ]; then
-            echo "::warning title=Stale flows submodule::vendor/flows ($LOCAL) is behind origin/main ($REMOTE). Run: git submodule update --remote vendor/flows"
+            echo "::warning title=Stale flows submodule::vendor/flows gitlink ($LOCAL) is behind origin/main ($REMOTE). Run: git submodule update --remote vendor/flows"
           else
-            echo "vendor/flows matches origin/main ($LOCAL)"
+            echo "vendor/flows gitlink matches origin/main ($LOCAL)"
           fi
 
   secret-scan:
