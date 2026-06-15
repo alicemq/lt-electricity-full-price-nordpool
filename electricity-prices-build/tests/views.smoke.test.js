@@ -28,6 +28,7 @@ const mockUpcoming = {
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
+    name: 'today',
     meta: {
       title: { lt: 'Today', en: 'Today' },
       description: { lt: 'Desc', en: 'Desc' },
@@ -36,6 +37,7 @@ vi.mock('vue-router', () => ({
     fullPath: '/today',
     query: {},
   }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 vi.mock('../src/services/priceService.js', () => ({
