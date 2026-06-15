@@ -2,6 +2,16 @@ import express from 'express';
 import moment from 'moment-timezone';
 import syncWorker, { reloadCronSchedule } from './syncWorker.js';
 import { isInReleaseWindow } from './lib/sync/releaseWindow.js';
+import {
+  buildBackupFetchKey,
+  withBackupFetchGuard,
+} from './lib/prices/backupFetchGuard.js';
+import {
+  needsBackupFetch,
+  parseAllowBackupFlag,
+  resolveBackupFetchPlan,
+  withTimeout,
+} from './lib/prices/backupFetchPolicy.js';
 import { requireAdminToken } from './lib/admin/auth.js';
 import {
   listCronSchedules,
@@ -213,6 +223,7 @@ router.get('/nps/price/:country/current', async (req, res) => {
 router.get('/nps/prices', async (req, res) => {
   try {
     let { date, start, end, country } = req.query;
+    const allowBackup = parseAllowBackupFlag(req.query);
     const requestedAll = !country;
     country = (country || '').toLowerCase();
     
@@ -287,129 +298,153 @@ router.get('/nps/prices', async (req, res) => {
     // Nordpool release window. On-demand Elering fetch below is a fallback when DB
     // data is missing or incomplete outside that window.
     let dataSource = 'db';
-    let needsLiveFetch = false;
-    if (rawData.length === 0) {
-      needsLiveFetch = true;
-    } else if (date) {
-      // For single date, check if we have sufficient records
-      // Expected: 23-25 for 60-min MTU (accounting for DST), 92-100 for 15-min MTU (accounting for DST)
-      // Use the same logic as isDateComplete: check if count is within expected range
-      const recordCount = rawData.length;
-      let isComplete = false;
-      
-      if (recordCount >= 90) {
-        // 15-minute MTU: expect 92-100 records (accounting for DST)
-        isComplete = recordCount >= 92 && recordCount <= 100;
-      } else if (recordCount > 0) {
-        // 60-minute MTU: expect 23-25 records (accounting for DST)
-        isComplete = recordCount >= 23 && recordCount <= 25;
+    let backupSkippedReason = null;
+    const releaseWindowActive = isInReleaseWindow();
+    const needsLiveFetch = needsBackupFetch(rawData, date);
+    const backupPlan = resolveBackupFetchPlan({
+      needsLiveFetch,
+      inReleaseWindow: releaseWindowActive,
+      allowBackup,
+    });
+
+    if (needsLiveFetch && !backupPlan.attempt) {
+      console.log(`[Backup Fetch] Skipped (${backupPlan.reason}) — sync worker owns ingestion for ${date || `${start} to ${end}`}`);
+      backupSkippedReason = backupPlan.reason;
+      if (rawData.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No price data found for the specified date range',
+          code: 'NO_DATA_FOUND',
+          meta: {
+            dataSource: 'partial',
+            releaseWindowActive,
+            backupSkippedReason,
+            dbRecordCount: 0,
+          },
+        });
       }
-      
-      if (!isComplete) {
-        needsLiveFetch = true;
-        console.log(`[On-Demand Fetch] Insufficient data for ${date}: found ${recordCount} records, expected 23-25 (60-min) or 92-100 (15-min)`);
-      }
-    }
-    
-    // If no data found or insufficient data, try backup fetch from Elering API
-    if (needsLiveFetch) {
-      if (isInReleaseWindow()) {
-        console.log(`[Backup Fetch] Skipped during release window — sync worker owns ingestion for ${date || `${start} to ${end}`}`);
-        if (rawData.length === 0) {
-          return res.status(404).json({
-            success: false,
-            error: 'No price data found for the specified date range',
-            code: 'NO_DATA_FOUND',
-            meta: { dataSource: 'partial', releaseWindowActive: true }
-          });
-        }
-        dataSource = 'partial';
-      } else {
-      console.log(`[Backup Fetch] No or insufficient data in DB for ${date || `${start} to ${end}`} (${country || 'all'}), attempting live fetch...`);
-      
+      dataSource = 'partial';
+    } else if (backupPlan.attempt) {
+      const backupKey = buildBackupFetchKey({ country, date, start, end });
+      console.log(`[Backup Fetch] Attempting vendor backup (${backupPlan.reason}) for ${date || `${start} to ${end}`} (${country || 'all'})`);
+
       try {
-        // Determine date range for fetch
-        let fetchStartDate, fetchEndDate;
-        if (date) {
-          fetchStartDate = moment.tz(date, "Europe/Vilnius").format('YYYY-MM-DD');
-          fetchEndDate = fetchStartDate;
-        } else if (start && end) {
-          fetchStartDate = moment.tz(start, "Europe/Vilnius").format('YYYY-MM-DD');
-          fetchEndDate = moment.tz(end, "Europe/Vilnius").format('YYYY-MM-DD');
-        } else {
-          return res.status(404).json({ 
-            success: false,
-            error: 'No price data found for the specified date range',
-            code: 'NO_DATA_FOUND'
-          });
-        }
-        
-        // Fetch data from Elering API
-        const eleringApi = syncWorker.api;
-        if (requestedAll) {
-          // Fetch all countries
-          const allCountriesData = await eleringApi.fetchAllCountriesData(fetchStartDate, fetchEndDate);
-          
-          // Store in database
-          for (const [countryCode, countryData] of Object.entries(allCountriesData)) {
-            if (countryData && countryData.length > 0) {
-              await syncWorker.insertPriceData(countryData, countryCode);
+        const guardResult = await withBackupFetchGuard(backupKey, async () => {
+          let fetchStartDate;
+          let fetchEndDate;
+          if (date) {
+            fetchStartDate = moment.tz(date, 'Europe/Vilnius').format('YYYY-MM-DD');
+            fetchEndDate = fetchStartDate;
+          } else if (start && end) {
+            fetchStartDate = moment.tz(start, 'Europe/Vilnius').format('YYYY-MM-DD');
+            fetchEndDate = moment.tz(end, 'Europe/Vilnius').format('YYYY-MM-DD');
+          } else {
+            return { ok: false, code: 'NO_DATA_FOUND' };
+          }
+
+          const eleringApi = syncWorker.api;
+          if (requestedAll) {
+            const allCountriesData = await withTimeout(
+              eleringApi.fetchAllCountriesData(fetchStartDate, fetchEndDate),
+            );
+            for (const [countryCode, countryData] of Object.entries(allCountriesData)) {
+              if (countryData && countryData.length > 0) {
+                await syncWorker.insertPriceData(countryData, countryCode);
+              }
             }
+            return { ok: true, rows: await getPriceDataAll(startDate, endDate) };
           }
-          
-          // Re-query database
-          rawData = await getPriceDataAll(startDate, endDate);
-        } else {
-          // Fetch single country
-          const countryData = await eleringApi.fetchPricesForRange(fetchStartDate, fetchEndDate, country);
-          
+
+          const countryData = await withTimeout(
+            eleringApi.fetchPricesForRange(fetchStartDate, fetchEndDate, country),
+          );
           if (countryData && countryData.length > 0) {
-            // Store in database
             await syncWorker.insertPriceData(countryData, country);
-            
-            // Re-query database
-            rawData = await getPriceData(startDate, endDate, country);
+            return { ok: true, rows: await getPriceData(startDate, endDate, country) };
+          }
+          return { ok: true, rows: [] };
+        });
+
+        if (guardResult.status === 'rate_limited') {
+          backupSkippedReason = 'rate_limited';
+          if (rawData.length === 0) {
+            return res.status(503).json({
+              success: false,
+              error: 'Backup fetch temporarily rate-limited; retry shortly',
+              code: 'BACKUP_RATE_LIMITED',
+              meta: {
+                dataSource: 'partial',
+                releaseWindowActive,
+                backupSkippedReason,
+                backupCooldownMs: guardResult.cooldownMs,
+                dbRecordCount: 0,
+              },
+            });
+          }
+          dataSource = 'partial';
+        } else {
+          const fetchOutcome = guardResult.result;
+          if (fetchOutcome?.ok === false && fetchOutcome.code === 'NO_DATA_FOUND') {
+            return res.status(404).json({
+              success: false,
+              error: 'No price data found for the specified date range',
+              code: 'NO_DATA_FOUND',
+            });
+          }
+
+          let refreshedRows = fetchOutcome?.rows || rawData;
+          if (date) {
+            const dateStart = moment.tz(date, 'Europe/Vilnius').startOf('day').unix();
+            const dateEnd = moment.tz(date, 'Europe/Vilnius').endOf('day').unix();
+            refreshedRows = refreshedRows.filter((item) => item.timestamp >= dateStart && item.timestamp <= dateEnd);
+          } else if (start && end) {
+            const rangeStart = moment.tz(start, 'Europe/Vilnius').startOf('day').unix();
+            const rangeEnd = moment.tz(end, 'Europe/Vilnius').endOf('day').unix();
+            refreshedRows = refreshedRows.filter((item) => item.timestamp >= rangeStart && item.timestamp <= rangeEnd);
+          }
+
+          if (refreshedRows.length === 0) {
+            if (rawData.length > 0) {
+              dataSource = 'partial';
+              backupSkippedReason = 'vendor_empty';
+            } else {
+              return res.status(404).json({
+                success: false,
+                error: 'No price data available from Elering API for the specified date range',
+                code: 'NO_DATA_FOUND',
+                meta: {
+                  dataSource: 'partial',
+                  releaseWindowActive,
+                  backupSkippedReason: 'vendor_empty',
+                  dbRecordCount: 0,
+                },
+              });
+            }
+          } else {
+            rawData = refreshedRows;
+            dataSource = 'vendor_backup';
+            console.log(`[Backup Fetch] Served ${rawData.length} records (${guardResult.status})`);
           }
         }
-        
-        // Filter re-queried data to only include requested date(s) in Vilnius timezone
-        if (date) {
-          const dateStart = moment.tz(date, "Europe/Vilnius").startOf('day').unix();
-          const dateEnd = moment.tz(date, "Europe/Vilnius").endOf('day').unix();
-          rawData = rawData.filter(item => 
-            item.timestamp >= dateStart && item.timestamp <= dateEnd
-          );
-        } else if (start && end) {
-          const rangeStart = moment.tz(start, "Europe/Vilnius").startOf('day').unix();
-          const rangeEnd = moment.tz(end, "Europe/Vilnius").endOf('day').unix();
-          rawData = rawData.filter(item => 
-            item.timestamp >= rangeStart && item.timestamp <= rangeEnd
-          );
-        }
-        
-        if (rawData.length === 0) {
-          return res.status(404).json({ 
-            success: false,
-            error: 'No price data available from Elering API for the specified date range',
-            code: 'NO_DATA_FOUND'
-          });
-        }
-        
-        console.log(`[Backup Fetch] Successfully fetched and stored ${rawData.length} records`);
-        dataSource = 'vendor_backup';
       } catch (error) {
-        console.error(`[Backup Fetch] Error fetching data from Elering API:`, error.message);
+        console.error('[Backup Fetch] Error fetching data from Elering API:', error.message);
+        backupSkippedReason = error.message.includes('timeout') ? 'timeout' : 'vendor_error';
         if (rawData.length > 0) {
           dataSource = 'partial';
         } else {
-        return res.status(500).json({ 
-          success: false,
-          error: 'Failed to fetch data from Elering API',
-          code: 'FETCH_ERROR',
-          details: error.message
-        });
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch data from Elering API',
+            code: 'FETCH_ERROR',
+            details: error.message,
+            meta: {
+              dataSource: 'partial',
+              releaseWindowActive,
+              backupSkippedReason,
+              dbRecordCount: 0,
+            },
+          });
         }
-      }
       }
     }
     
@@ -450,7 +485,9 @@ router.get('/nps/prices', async (req, res) => {
         timezone: 'Europe/Vilnius',
         intervalSeconds,
         dataSource,
-        releaseWindowActive: isInReleaseWindow()
+        releaseWindowActive,
+        dbRecordCount: rawData.length,
+        ...(backupSkippedReason ? { backupSkippedReason } : {}),
       }
     });
   } catch (error) {

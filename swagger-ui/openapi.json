@@ -376,7 +376,7 @@
     "/nps/prices": {
       "get": {
         "summary": "Get price data for date or date range",
-        "description": "Retrieve electricity prices for a specific date or date range.\n\n**Features:**\n- Single date or date range queries\n- Multi-country support (LT, EE, LV, FI)\n- DST-aware timestamp handling\n- Optimized database queries\n\n**Data source:** Primary ingestion is the background sync worker. When the database\nis empty or incomplete for the requested date, this endpoint may perform a one-time\nbackup fetch from the Elering API before responding (see issue #11 for demotion plan).\n\n**Usage Examples:**\n- Single day: `?date=2025-06-26&country=lt`\n- Date range: `?start=2025-06-01&end=2025-06-30&country=ee`\n- All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)\n\n**Response Format:**\n- One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)\n- Prices in EUR/MWh\n- Unix timestamps (seconds) for easy processing\n",
+        "description": "Retrieve electricity prices for a specific date or date range.\n\n**Features:**\n- Single date or date range queries\n- Multi-country support (LT, EE, LV, FI)\n- DST-aware timestamp handling\n- Optimized database queries\n\n**Data source:** Primary ingestion is the background sync worker during the Nordpool\nrelease window (12:45–15:55 Europe/Paris). When the database is empty or incomplete,\nthis endpoint may perform a rate-limited backup fetch from the Elering API **outside**\nthe release window. Pass `allow_backup=1` to force backup during the release window.\n\n**Response metadata (`meta.dataSource`):**\n- `db` — served from database only\n- `vendor_backup` — vendor fetch supplemented missing rows\n- `partial` — incomplete DB data; backup skipped, failed, or rate-limited\n\n**Usage Examples:**\n- Single day: `?date=2025-06-26&country=lt`\n- Date range: `?start=2025-06-01&end=2025-06-30&country=ee`\n- All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)\n\n**Response Format:**\n- One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)\n- Prices in EUR/MWh\n- Unix timestamps (seconds) for easy processing\n",
         "tags": [
           "Prices"
         ],
@@ -424,6 +424,19 @@
               ]
             },
             "description": "Country code (case insensitive). If omitted, returns data for all countries."
+          },
+          {
+            "name": "allow_backup",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true",
+                "yes"
+              ]
+            },
+            "description": "Force vendor backup fetch even during the Nordpool release window (default: skip backup in-window)."
           }
         ],
         "responses": {
@@ -471,6 +484,30 @@
                           "type": "integer",
                           "description": "Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)",
                           "example": 900
+                        },
+                        "dataSource": {
+                          "type": "string",
+                          "enum": [
+                            "db",
+                            "vendor_backup",
+                            "partial"
+                          ],
+                          "description": "How the response was assembled",
+                          "example": "db"
+                        },
+                        "releaseWindowActive": {
+                          "type": "boolean",
+                          "description": "Whether the Nordpool release window was active when the request was handled",
+                          "example": false
+                        },
+                        "backupSkippedReason": {
+                          "type": "string",
+                          "description": "Present when backup was skipped or failed (e.g. release_window, rate_limited, timeout)"
+                        },
+                        "dbRecordCount": {
+                          "type": "integer",
+                          "description": "Number of records returned from the database layer",
+                          "example": 24
                         },
                         "total_records": {
                           "type": "integer",

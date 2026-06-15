@@ -264,9 +264,15 @@ paths:
         - DST-aware timestamp handling
         - Optimized database queries
         
-        **Data source:** Primary ingestion is the background sync worker. When the database
-        is empty or incomplete for the requested date, this endpoint may perform a one-time
-        backup fetch from the Elering API before responding (see issue #11 for demotion plan).
+        **Data source:** Primary ingestion is the background sync worker during the Nordpool
+        release window (12:45–15:55 Europe/Paris). When the database is empty or incomplete,
+        this endpoint may perform a rate-limited backup fetch from the Elering API **outside**
+        the release window. Pass `allow_backup=1` to force backup during the release window.
+        
+        **Response metadata (`meta.dataSource`):**
+        - `db` — served from database only
+        - `vendor_backup` — vendor fetch supplemented missing rows
+        - `partial` — incomplete DB data; backup skipped, failed, or rate-limited
         
         **Usage Examples:**
         - Single day: `?date=2025-06-26&country=lt`
@@ -307,6 +313,12 @@ paths:
             type: string
             enum: [lt, ee, lv, fi]
           description: 'Country code (case insensitive). If omitted, returns data for all countries.'
+        - name: allow_backup
+          in: query
+          schema:
+            type: string
+            enum: ['1', 'true', 'yes']
+          description: 'Force vendor backup fetch even during the Nordpool release window (default: skip backup in-window).'
       responses:
         '200':
           description: 'Price data for the specified period'
@@ -344,6 +356,22 @@ paths:
                         type: integer
                         description: 'Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)'
                         example: 900
+                      dataSource:
+                        type: string
+                        enum: [db, vendor_backup, partial]
+                        description: 'How the response was assembled'
+                        example: db
+                      releaseWindowActive:
+                        type: boolean
+                        description: 'Whether the Nordpool release window was active when the request was handled'
+                        example: false
+                      backupSkippedReason:
+                        type: string
+                        description: 'Present when backup was skipped or failed (e.g. release_window, rate_limited, timeout)'
+                      dbRecordCount:
+                        type: integer
+                        description: 'Number of records returned from the database layer'
+                        example: 24
                       total_records:
                         type: integer
                         example: 24
