@@ -9,8 +9,8 @@
       "url": "https://github.com/your-repo/electricity-prices"
     },
     "license": {
-      "name": "MIT",
-      "url": "https://opensource.org/licenses/MIT"
+      "name": "AGPL-3.0-only",
+      "url": "https://www.gnu.org/licenses/agpl-3.0.html"
     },
     "externalDocs": {
       "description": "Project Documentation",
@@ -243,7 +243,7 @@
                   "data": [
                     {
                       "timestamp": 1750885200,
-                      "price": 75.0,
+                      "price": 75,
                       "country": "LT"
                     }
                   ],
@@ -339,7 +339,7 @@
                   "data": [
                     {
                       "timestamp": 1750885200,
-                      "price": 75.0,
+                      "price": 75,
                       "country": "LT"
                     }
                   ],
@@ -376,7 +376,7 @@
     "/nps/prices": {
       "get": {
         "summary": "Get price data for date or date range",
-        "description": "Retrieve electricity prices for a specific date or date range.\n\n**Features:**\n- Single date or date range queries\n- Multi-country support (LT, EE, LV, FI)\n- DST-aware timestamp handling\n- Optimized database queries\n\n**Usage Examples:**\n- Single day: `?date=2025-06-26&country=lt`\n- Date range: `?start=2025-06-01&end=2025-06-30&country=ee`\n- All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)\n\n**Response Format:**\n- One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)\n- Prices in EUR/MWh\n- Unix timestamps (seconds) for easy processing\n",
+        "description": "Retrieve electricity prices for a specific date or date range.\n\n**Features:**\n- Single date or date range queries\n- Multi-country support (LT, EE, LV, FI)\n- DST-aware timestamp handling\n- Optimized database queries\n\n**Data source:** Primary ingestion is the background sync worker. When the database\nis empty or incomplete for the requested date, this endpoint may perform a one-time\nbackup fetch from the Elering API before responding (see issue #11 for demotion plan).\n\n**Usage Examples:**\n- Single day: `?date=2025-06-26&country=lt`\n- Date range: `?start=2025-06-01&end=2025-06-30&country=ee`\n- All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)\n\n**Response Format:**\n- One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)\n- Prices in EUR/MWh\n- Unix timestamps (seconds) for easy processing\n",
         "tags": [
           "Prices"
         ],
@@ -502,7 +502,7 @@
                         "lt": [
                           {
                             "timestamp": 1750885200,
-                            "price": 75.0
+                            "price": 75
                           },
                           {
                             "timestamp": 1750888800,
@@ -535,7 +535,7 @@
                         "lt": [
                           {
                             "timestamp": 1750885200,
-                            "price": 75.0
+                            "price": 75
                           },
                           {
                             "timestamp": 1750888800,
@@ -743,7 +743,7 @@
                     "lt": [
                       {
                         "timestamp": 1750932000,
-                        "price": 75.0
+                        "price": 75
                       },
                       {
                         "timestamp": 1750932900,
@@ -861,7 +861,7 @@
                   "data": [
                     {
                       "timestamp": 1750885200,
-                      "price": 75.0,
+                      "price": 75,
                       "country": "lt"
                     }
                   ],
@@ -877,6 +877,203 @@
           },
           "404": {
             "description": "No price data found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/status": {
+      "get": {
+        "summary": "Get sync worker status",
+        "description": "Returns the current sync worker state including whether a sync is running, scheduled jobs, and in-progress sync metadata. Used by the frontend PWA and ops tooling for smart sync decisions.\n",
+        "tags": [
+          "Sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync worker status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "isRunning": {
+                          "type": "boolean"
+                        },
+                        "startTime": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "lastHealthCheck": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "scheduledJobs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "currentSync": {
+                          "type": "object",
+                          "nullable": true
+                        },
+                        "syncInProgress": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "isRunning": false,
+                    "startTime": null,
+                    "lastHealthCheck": "2026-06-15T10:30:00.000Z",
+                    "scheduledJobs": [],
+                    "currentSync": null,
+                    "syncInProgress": false
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get sync status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/trigger": {
+      "post": {
+        "summary": "Trigger manual or catch-up sync",
+        "description": "Triggers a sync operation. When `country` is provided in the request body, runs a manual sync for that country over `daysBack` days (default 1). When `country` is omitted, runs a catch-up sync from the last successful sync state.\n",
+        "tags": [
+          "Sync"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "enum": [
+                      "lt",
+                      "ee",
+                      "lv",
+                      "fi"
+                    ],
+                    "description": "Country code for manual sync. Omit for catch-up sync."
+                  },
+                  "daysBack": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1,
+                    "description": "Number of days to sync when country is specified."
+                  }
+                }
+              },
+              "examples": {
+                "catchUp": {
+                  "summary": "Catch-up sync (all countries from last OK state)",
+                  "value": {}
+                },
+                "manualCountry": {
+                  "summary": "Manual sync for one country",
+                  "value": {
+                    "country": "lt",
+                    "daysBack": 2
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "records": {
+                      "type": "integer",
+                      "description": "Present for manual country sync"
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "Present for manual country sync"
+                    },
+                    "daysBack": {
+                      "type": "integer",
+                      "description": "Present for manual country sync"
+                    }
+                  }
+                },
+                "examples": {
+                  "catchUp": {
+                    "value": {
+                      "success": true,
+                      "message": "Catch-up sync completed"
+                    }
+                  },
+                  "manual": {
+                    "value": {
+                      "success": true,
+                      "message": "Manual sync completed for LT",
+                      "records": 96,
+                      "country": "lt",
+                      "daysBack": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another sync is already running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Manual sync failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -920,6 +1117,263 @@
           },
           "500": {
             "description": "Failed to reset initial sync status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/configurations": {
+      "get": {
+        "summary": "Get price configurations and system charges",
+        "description": "Retrieve electricity tariff configurations and system charges for price calculations.\n\n**Features:**\n- Multi-country support (LT, EE, LV, FI)\n- Historical tariff data grouped by effective date\n- System charges (VIAP, distributionplus, etc.)\n- Optimized for frontend caching\n\n**Usage Examples:**\n- Single country: `?country=lt`\n- All countries: (omit country parameter)\n\n**Response Format:**\n- Tariffs grouped by country, then by effective date, then by zone and plan\n- System charges grouped by country, then by effective date\n- Data structure optimized for date-based lookups\n",
+        "tags": [
+          "Configuration"
+        ],
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lt",
+                "ee",
+                "lv",
+                "fi"
+              ]
+            },
+            "description": "Country code (case insensitive). If omitted, returns data for all countries."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price configurations and system charges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tariffs": {
+                          "type": "object",
+                          "description": "Tariffs grouped by country, then effective date, then zone and plan",
+                          "additionalProperties": {
+                            "type": "object",
+                            "description": "Country code (lt, ee, lv, fi)",
+                            "additionalProperties": {
+                              "type": "object",
+                              "description": "Effective date (YYYY-MM-DD)",
+                              "additionalProperties": {
+                                "type": "object",
+                                "description": "Zone name (Four zones, Two zones, Single zone)",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "description": "Plan name (Standart, Smart, Effective, Home, etc.)",
+                                  "additionalProperties": {
+                                    "type": "number",
+                                    "description": "Price for time period (morning, day, evening, night)"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "type": "object",
+                          "description": "System charges grouped by country, then effective date",
+                          "additionalProperties": {
+                            "type": "object",
+                            "description": "Country code (lt, ee, lv, fi)",
+                            "additionalProperties": {
+                              "type": "object",
+                              "description": "Effective date (YYYY-MM-DD)",
+                              "additionalProperties": {
+                                "type": "number",
+                                "description": "Charge amount (VIAP, distributionplus, etc.)"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "country": {
+                          "type": "string",
+                          "description": "Requested country or \"all\"",
+                          "example": "lt"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "Number of countries in response",
+                          "example": 1
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "single_country": {
+                    "summary": "Price configurations for Lithuania",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "tariffs": {
+                          "lt": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              },
+                              "Two zones": {
+                                "Standart": {
+                                  "day": 0.0968,
+                                  "night": 0.05687
+                                }
+                              }
+                            },
+                            "2024-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.07502,
+                                  "day": 0.09438,
+                                  "evening": 0.12826,
+                                  "night": 0.05929
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "lt": {
+                            "2024-01-01": {
+                              "VIAP": 0,
+                              "distributionplus": 0.00045
+                            },
+                            "2025-01-01": {
+                              "VIAP": -0.00039,
+                              "distributionplus": 0.000893
+                            }
+                          }
+                        }
+                      },
+                      "meta": {
+                        "country": "lt",
+                        "count": 1
+                      }
+                    }
+                  },
+                  "all_countries": {
+                    "summary": "Price configurations for all countries",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "tariffs": {
+                          "lt": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "ee": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "lv": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          },
+                          "fi": {
+                            "2023-01-01": {
+                              "Four zones": {
+                                "Smart": {
+                                  "morning": 0.06534,
+                                  "day": 0.07986,
+                                  "evening": 0.10648,
+                                  "night": 0.05203
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "systemCharges": {
+                          "lt": {
+                            "2024-01-01": {
+                              "VIAP": 0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "ee": {
+                            "2024-01-01": {
+                              "VIAP": 0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "lv": {
+                            "2024-01-01": {
+                              "VIAP": 0,
+                              "distributionplus": 0.00045
+                            }
+                          },
+                          "fi": {
+                            "2024-01-01": {
+                              "VIAP": 0,
+                              "distributionplus": 0.00045
+                            }
+                          }
+                        }
+                      },
+                      "meta": {
+                        "country": "all",
+                        "count": 4
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to fetch configurations",
             "content": {
               "application/json": {
                 "schema": {
@@ -1052,7 +1506,7 @@
           "price": {
             "type": "number",
             "description": "Electricity price in EUR/MWh",
-            "example": 75.0,
+            "example": 75,
             "minimum": 0,
             "format": "float"
           },
@@ -1074,7 +1528,7 @@
         ],
         "example": {
           "timestamp": 1750885200,
-          "price": 75.0,
+          "price": 75,
           "country": "LT"
         }
       },
@@ -1223,263 +1677,6 @@
           "code": "NO_DATA_FOUND",
           "timestamp": "2025-06-26T00:15:30.024Z",
           "path": "/api/v1/nps/price/lt/latest"
-        }
-      }
-    },
-    "/configurations": {
-      "get": {
-        "summary": "Get price configurations and system charges",
-        "description": "Retrieve electricity tariff configurations and system charges for price calculations.\n\n**Features:**\n- Multi-country support (LT, EE, LV, FI)\n- Historical tariff data grouped by effective date\n- System charges (VIAP, distributionplus, etc.)\n- Optimized for frontend caching\n\n**Usage Examples:**\n- Single country: `?country=lt`\n- All countries: (omit country parameter)\n\n**Response Format:**\n- Tariffs grouped by country, then by effective date, then by zone and plan\n- System charges grouped by country, then by effective date\n- Data structure optimized for date-based lookups\n",
-        "tags": [
-          "Configuration"
-        ],
-        "parameters": [
-          {
-            "name": "country",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "lt",
-                "ee",
-                "lv",
-                "fi"
-              ]
-            },
-            "description": "Country code (case insensitive). If omitted, returns data for all countries."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Price configurations and system charges",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "tariffs": {
-                          "type": "object",
-                          "description": "Tariffs grouped by country, then effective date, then zone and plan",
-                          "additionalProperties": {
-                            "type": "object",
-                            "description": "Country code (lt, ee, lv, fi)",
-                            "additionalProperties": {
-                              "type": "object",
-                              "description": "Effective date (YYYY-MM-DD)",
-                              "additionalProperties": {
-                                "type": "object",
-                                "description": "Zone name (Four zones, Two zones, Single zone)",
-                                "additionalProperties": {
-                                  "type": "object",
-                                  "description": "Plan name (Standart, Smart, Effective, Home, etc.)",
-                                  "additionalProperties": {
-                                    "type": "number",
-                                    "description": "Price for time period (morning, day, evening, night)"
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "systemCharges": {
-                          "type": "object",
-                          "description": "System charges grouped by country, then effective date",
-                          "additionalProperties": {
-                            "type": "object",
-                            "description": "Country code (lt, ee, lv, fi)",
-                            "additionalProperties": {
-                              "type": "object",
-                              "description": "Effective date (YYYY-MM-DD)",
-                              "additionalProperties": {
-                                "type": "number",
-                                "description": "Charge amount (VIAP, distributionplus, etc.)"
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "country": {
-                          "type": "string",
-                          "description": "Requested country or \"all\"",
-                          "example": "lt"
-                        },
-                        "count": {
-                          "type": "integer",
-                          "description": "Number of countries in response",
-                          "example": 1
-                        }
-                      }
-                    }
-                  }
-                },
-                "examples": {
-                  "single_country": {
-                    "summary": "Price configurations for Lithuania",
-                    "value": {
-                      "success": true,
-                      "data": {
-                        "tariffs": {
-                          "lt": {
-                            "2023-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.06534,
-                                  "day": 0.07986,
-                                  "evening": 0.10648,
-                                  "night": 0.05203
-                                }
-                              },
-                              "Two zones": {
-                                "Standart": {
-                                  "day": 0.0968,
-                                  "night": 0.05687
-                                }
-                              }
-                            },
-                            "2024-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.07502,
-                                  "day": 0.09438,
-                                  "evening": 0.12826,
-                                  "night": 0.05929
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "systemCharges": {
-                          "lt": {
-                            "2024-01-01": {
-                              "VIAP": 0.0,
-                              "distributionplus": 0.00045
-                            },
-                            "2025-01-01": {
-                              "VIAP": -0.00039,
-                              "distributionplus": 0.000893
-                            }
-                          }
-                        }
-                      },
-                      "meta": {
-                        "country": "lt",
-                        "count": 1
-                      }
-                    }
-                  },
-                  "all_countries": {
-                    "summary": "Price configurations for all countries",
-                    "value": {
-                      "success": true,
-                      "data": {
-                        "tariffs": {
-                          "lt": {
-                            "2023-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.06534,
-                                  "day": 0.07986,
-                                  "evening": 0.10648,
-                                  "night": 0.05203
-                                }
-                              }
-                            }
-                          },
-                          "ee": {
-                            "2023-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.06534,
-                                  "day": 0.07986,
-                                  "evening": 0.10648,
-                                  "night": 0.05203
-                                }
-                              }
-                            }
-                          },
-                          "lv": {
-                            "2023-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.06534,
-                                  "day": 0.07986,
-                                  "evening": 0.10648,
-                                  "night": 0.05203
-                                }
-                              }
-                            }
-                          },
-                          "fi": {
-                            "2023-01-01": {
-                              "Four zones": {
-                                "Smart": {
-                                  "morning": 0.06534,
-                                  "day": 0.07986,
-                                  "evening": 0.10648,
-                                  "night": 0.05203
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "systemCharges": {
-                          "lt": {
-                            "2024-01-01": {
-                              "VIAP": 0.0,
-                              "distributionplus": 0.00045
-                            }
-                          },
-                          "ee": {
-                            "2024-01-01": {
-                              "VIAP": 0.0,
-                              "distributionplus": 0.00045
-                            }
-                          },
-                          "lv": {
-                            "2024-01-01": {
-                              "VIAP": 0.0,
-                              "distributionplus": 0.00045
-                            }
-                          },
-                          "fi": {
-                            "2024-01-01": {
-                              "VIAP": 0.0,
-                              "distributionplus": 0.00045
-                            }
-                          }
-                        }
-                      },
-                      "meta": {
-                        "country": "all",
-                        "count": 4
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Failed to fetch configurations",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
         }
       }
     }

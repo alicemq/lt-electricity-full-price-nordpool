@@ -66,6 +66,9 @@ jobs:
             if (!y.includes('/health')) throw new Error('missing /health');
           "
 
+      - name: OpenAPI JSON sync check
+        run: node bin/openapi-json-from-yaml.js --check
+
   secret-scan:
     runs-on: ubuntu-latest
     if: ${{ (vars.CI_GITLEAKS_ENABLED || '1') != '0' }}
