@@ -113,7 +113,9 @@ When executing a revamp phase or adoption slice, agents MUST NOT stop after the 
 1. **Pick** the next issue or checklist row from the active slice (e.g. UA0–UA2 backlog, adopter validation).
 2. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in this repo or [flows](https://github.com/alicemq/flows/issues).
 3. **Fix → commit → PR** — implement, verify locally, publish; use `Fixes #N` / `Refs #N`.
-4. **Continue** until the slice is complete or you are blocked (document blockers in issue/PR).
+4. **Merge when CI green** — squash-merge to `main` (repo default) when required checks pass, unless the user said "do not merge" or the PR needs a human review hold. Merging is not a stop point; agents continue the slice unless blocked.
+5. **Rebase stacked PRs** — immediately update dependent branches onto `main`. **Merge order:** foundation/lowest stack PR first, then dependents top-down.
+6. **Continue** — pick the next issue or checklist row until the slice is complete or you are blocked (document blockers in issue/PR).
 
 The scope gate applies to each unit of work; the work loop governs sequencing across units.
 
