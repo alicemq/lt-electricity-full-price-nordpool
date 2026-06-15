@@ -232,9 +232,6 @@ export function getDaysNeedingSync(country = 'lt', now = moment()) {
   }
 
   return candidates.filter((dateStr) => {
-    if (isDaySynced(country, dateStr)) {
-      return false;
-    }
     const validation = validateDayCompleteness(dateStr, country);
     return !validation.isComplete;
   });
