@@ -145,7 +145,7 @@ After initial sync completes, capture a portable Postgres dump for dev/CI fixtur
 git lfs install && git add data/db-backup/price-data.sql.gz && git commit
 ```
 
-LFS path: `data/db-backup/*.sql.gz`. Details: [docs/ops/db-backup-lfs.md](docs/ops/db-backup-lfs.md).
+LFS path: `data/db-backup/*.sql.gz`. Capture: [docs/ops/db-backup-lfs.md](docs/ops/db-backup-lfs.md). Restore and server cron: [docs/ops/backup-restore.md](docs/ops/backup-restore.md) (`bin/restore-db-lfs.sh`, `bin/server-backup.sh`).
 
 ## Scope gate
 

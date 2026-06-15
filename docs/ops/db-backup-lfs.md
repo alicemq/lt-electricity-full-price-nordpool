@@ -76,18 +76,26 @@ git lfs ls-files
 
 ## Restore locally
 
-**Into a fresh volume** (destroys existing DB data in the compose volume):
+Preferred (scripted, includes schema reset and verification):
 
 ```bash
-docker compose down
-docker volume rm lt-electricity-full-price-nordpool_postgres_data 2>/dev/null || true
-docker compose up -d db
-# wait for Postgres ready, then:
-gunzip -c data/db-backup/price-data.sql.gz | docker compose exec -T db psql -U electricity_user -d electricity_prices
-docker compose up -d
+git lfs pull
+./bin/restore-db-lfs.sh --fresh-volume
 ```
 
-Adjust volume name with `docker volume ls | grep postgres`.
+Restore into a running db without removing the volume:
+
+```bash
+./bin/restore-db-lfs.sh
+```
+
+Verify current database state:
+
+```bash
+./bin/restore-db-lfs.sh --verify-only
+```
+
+Server cron backups and production drills: [backup-restore.md](backup-restore.md).
 
 ## Notes
 
