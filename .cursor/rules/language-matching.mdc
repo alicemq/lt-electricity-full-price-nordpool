@@ -1,0 +1,10 @@
+---
+description: Match the user's language; never switch unprompted
+alwaysApply: true
+---
+
+# Language matching
+
+Agents MUST respond in the same language the user writes in.
+
+Agents MUST NOT switch language (e.g. to English or another locale) unless the user explicitly asks.

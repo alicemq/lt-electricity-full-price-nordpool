@@ -1,0 +1,61 @@
+---
+description: One subagent per PO-listed issue — parallel delegation and synthesis
+alwaysApply: true
+---
+
+# Subagent delegation
+
+When the PO lists **multiple separate issues or tasks**, the coordinating agent MUST spawn **one subagent per issue**. One subagent MUST NOT handle multiple PO-listed items.
+
+## Coordinator duties
+
+0. **Scope gate** — open or claim a GitHub issue for each PO-listed unit before delegation.
+1. Decompose the PO request into independent issues (or confirm one issue).
+2. Launch parallel subagents when work is independent; serialize API-first when HTTP/OpenAPI is shared.
+3. Serialize or split paths when subagents would edit the same files.
+4. Synthesize work subagent results into a single PO-facing summary (outcomes, blockers, next steps).
+5. **Integration verification** — re-run applicable quality gates on the combined merged tree.
+6. **Security review** — when MUST triggers apply, run `security-review` on combined diff before ship.
+7. Apply partial-ship rules; spawn one ship subagent (ce-commit-push-pr); **MUST NOT** commit, push, or open PR directly when work subagents were spawned.
+8. **CI watch** — ship subagent owns loop-on-ci after push; coordinator MAY own if ship subagent cannot loop.
+9. Register gaps as GitHub issues per [issue-registration](issue-registration.mdc); do not expand slice scope.
+
+Full protocol: [AGENTS.md](../../AGENTS.md#issue-registration).
+
+## Partial ship
+
+| Situation | Ship subagent |
+| --- | --- |
+| All PO-listed work subagents done | MUST spawn |
+| Blocked on PO decision, secrets, or irreversible choice for PO-listed item | MUST NOT spawn |
+| Optional item deferred; blocked work filed as debt and removed from slice AC | MAY spawn for completed items |
+
+## Work subagent duties
+
+- Own exactly **one** PO-listed issue end to end.
+- Run applicable quality gates before reporting done.
+- Return structured done (verification evidence, files changed) or blockers (tried, failed, needed decision/access) — not open-ended questions.
+- MUST NOT commit, push, or open PRs when a coordinator is active.
+
+## Ship subagent duties
+
+- Spawned once by the coordinator after integration verify and security review (when triggered).
+- MUST commit, push, and open or update a single PR for the combined slice diff.
+- Owns fix-ci / loop-on-ci after push until checks pass or blocked.
+
+## Example
+
+PO: "Fix login bug and add export button."
+
+- Subagent 1 → login bug only
+- Subagent 2 → export button only
+- Coordinator → scope gate → parallel launch → synthesize → integration verify → ship subagent → CI watch
+
+## Anti-patterns
+
+- One subagent doing both login and export when PO listed them separately
+- Each work subagent opening its own PR or pushing independently
+- Coordinator committing, pushing, or opening PR when work subagents were spawned
+- Coordinator implementing code while subagents are active on the same issue
+- Skipping integration verification on combined subagent diffs
+- Asking PO to pick implementation details that do not affect product behavior

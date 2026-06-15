@@ -1,0 +1,40 @@
+---
+description: Verification commands and done criteria for nordpool product repo changes
+alwaysApply: true
+---
+
+# Quality gates (product repo)
+
+Agents MUST NOT claim work is complete without running applicable checks on the **combined** working tree after coordinator synthesis.
+
+## By path
+
+| Paths | Command |
+| --- | --- |
+| `backend/**` (routes, middleware, lib) | Unit tests + `./bin/smoke-local.sh` |
+| HTTP contract changes | Update `swagger-ui/openapi.yaml` in same PR |
+| `electricity-prices-build/**` | Frontend lint/test per project CI |
+| Migrations | Sequential numbered SQL; no duplicate migration numbers |
+| `bin/*.sh`, `*.sh` | `bash -n <file>` |
+| New golden scenario | Add under `tests/golden/`; run in CI or locally |
+
+## Coordinator integration gate
+
+When a coordinator merges work from multiple subagents, MUST re-run applicable rows above on the **merged tree** before spawning the ship subagent.
+
+## PR discipline
+
+- Title: `[scope] <short description>`
+- Body: test plan checklist with commands actually run
+- Reference GitHub issue (`Fixes #N` or `Refs #N`)
+- One unit, one PR for solo work; coordinator multi-issue slices MAY use one combined PR when PO listed parallel issues
+
+## Security
+
+- MUST NOT commit `.env`, `local.env`, credentials, or `node_modules/`
+- Reference secret **names** in docs, never values
+- Run `security-review` subagent when MUST triggers in AGENTS.md apply
+
+## Contributing reference
+
+Product repos do not install flows [CONTRIBUTING.md](https://github.com/alicemq/flows/blob/main/CONTRIBUTING.md). Use this repo's `AGENTS.md` and checklists under `docs/checklists/`.

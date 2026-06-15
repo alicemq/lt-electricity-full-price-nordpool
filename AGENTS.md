@@ -1,6 +1,6 @@
 # Agent Handbook — Electricity Prices NordPool
 
-**Read this first.** This repo tracks Baltic NordPool electricity prices (LT, EE, LV, FI) via a Vue 3 frontend, Express API, and PostgreSQL.
+**Read this first.** This repo tracks Baltic NordPool electricity prices (LT, EE, LV, FI) via a Vue 3 frontend, Express API, and PostgreSQL. Canonical strategy: `STRATEGY.md`. Workflow rules: `docs/plans/agentic-workflow-plan.md`.
 
 ## Scope
 
@@ -17,7 +17,7 @@
 
 ## Hybrid flows reference (read-only)
 
-Agent workflow patterns were borrowed from [alicemq/flows](https://github.com/alicemq/flows) on **`main` (latest)**. Flows is reference material only, not a product dependency.
+Agent workflow patterns were borrowed from [alicemq/flows](https://github.com/alicemq/flows) **`v0.7.1`** (`vendor/flows` at `bc16808`). Flows is reference material only, not a product dependency.
 
 - **Tracking policy:** `vendor/flows` submodule follows **`main`** (default branch), not a detached tag
 - **Local copy:** git submodule at `vendor/flows` — read handbook and templates there (`vendor/flows/README.md`, `vendor/flows/examples/nordpool-revamp-checklist.md`)
@@ -75,8 +75,8 @@ Containerized electricity price monitor with Elering/NordPool sync, multi-countr
 ## Module boundaries
 
 ```text
-backend/src/           # Express API, sync worker, CLI
-backend/src/v1.js      # v1 price routes (large — split planned UA5)
+backend/src/                    # Express API, sync worker, CLI
+backend/src/v1.js               # v1 price routes (large — split planned UA5)
 electricity-prices-build/src/   # Vue SPA
 swagger-ui/openapi.yaml         # OpenAPI source of truth (UA3 will consolidate duplicates)
 database/init/                  # Schema bootstrap (single source of truth)
@@ -99,6 +99,8 @@ vendor/flows/                   # Read-only flows reference on main (submodule; 
 | Swagger | None | `/api/` via frontend proxy |
 
 OpenAPI: `swagger-ui/openapi.yaml`. HTTP contract changes MUST update OpenAPI in the same PR (UA3+).
+
+Golden integration harness (Postgres fixture + API scenarios): see [docs/testing/golden-harness.md](docs/testing/golden-harness.md).
 
 ## License policy
 
@@ -131,8 +133,6 @@ npm test --prefix electricity-prices-build
 node --test tests/seo/sitemap.routes.test.js
 ```
 
-Golden integration harness (Postgres fixture + API scenarios): see [docs/testing/golden-harness.md](docs/testing/golden-harness.md).
-
 Copy `deploy/local.env.example` to `deploy/local.env` for port overrides.
 
 ## DB snapshot (Git LFS)
@@ -158,6 +158,27 @@ LFS path: `data/db-backup/*.sql.gz`. Capture: [docs/ops/db-backup-lfs.md](docs/o
 
 **Exceptions:** typos in files already changed in the same PR; explicit hotfix (open follow-up issue).
 
+## Delivery (done means shipped)
+
+**Done** means verified **and** published: commit, push, and open or update a PR (or merge when CI is green unless the PO said "do not merge"). Leaving substantial completed work uncommitted or unpushed is a **flow bug**.
+
+### Shipping precedence
+
+| Precedence | Rule |
+| --- | --- |
+| **Default** | Solo agent or coordinator → ship subagent MUST commit, push, and open or update PR |
+| **Explicit PO skip only** | "do not commit", "local only", "analyze only" — skip commit/push; document skip reason |
+| **User-level IDE rules** | MUST NOT override workspace ship-by-default (e.g. "commit only when asked" does not apply here) |
+
+### Who ships
+
+| Role | Shipping duty |
+| --- | --- |
+| **Solo agent** (no delegation) | MUST commit, push, and open or update PR after quality gates pass |
+| **Work subagent** | MUST verify locally and report done or blockers; MUST NOT commit, push, or open PRs when a coordinator is active |
+| **Coordinator** (multi-issue delegation) | After synthesis and integration gates, MUST spawn **one** ship subagent; MUST NOT commit, push, or open PR directly when work subagents were spawned |
+| **Ship subagent** | Single PR per slice; owns loop-on-ci after push until checks pass or blocked |
+
 ## Product Owner policy
 
 The Product Owner does **not** manually merge PRs or perform code review. Agents own quality gates and delivery.
@@ -169,16 +190,36 @@ Agents **MUST**:
 - Fix CI failures and retry; rebase dependent stacked PRs onto `main` after each merge.
 - Continue the work loop without waiting for PO approval unless blocked (merge conflict, failing checks, or explicit user hold).
 
+### Product Owner operating model
+
+| Role | Responsibility |
+| --- | --- |
+| **Product Owner (PO)** | Outcomes, priorities, acceptance criteria |
+| **Agent** | Full DevOps + fullstack; technical decisions without PO unless blocked |
+
+Agents MUST decide implementation details autonomously. Ask the PO only for ambiguous acceptance criteria, priority conflicts, scope expansion, irreversible product choices, or missing access.
+
+Agents MUST NOT ask the PO to confirm optional polish, housekeeping, or obvious follow-ups from completed work. Same files already in slice and within acceptance criteria → implement now; otherwise register a `source:ai` debt issue. Agents MUST NOT end with "do you want me to…?" unless the choice is a product decision, irreversible posture change, or true blocker.
+
+### Polish decision tree
+
+| Condition | Action |
+| --- | --- |
+| Same files already in the current slice **and** within stated acceptance criteria | Implement now |
+| Touches files or scope outside current AC, or unrelated refactor | Register `source:ai` `type:debt` issue in this repo; do not expand slice |
+| Product decision or irreversible posture change | Ask PO once |
+
 ## Work loop (revamp and adoption)
 
 When executing a revamp phase or adoption slice, agents MUST NOT stop after the first deliverable while scoped work remains.
 
 1. **Pick** the next issue or checklist row from the active slice (e.g. UA0–UA2 backlog, local revamp validation).
-2. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in **this repo only**.
-3. **Fix → commit → PR** — implement, verify locally, publish; use `Fixes #N` / `Refs #N`.
-4. **Merge when CI green** — squash-merge to `main` (repo default) when required checks pass, unless the user said "do not merge" or the PR needs a human review hold. Merging is not a stop point; agents continue the slice unless blocked.
-5. **Rebase stacked PRs** — immediately update dependent branches onto `main`. **Merge order:** foundation/lowest stack PR first, then dependents top-down. When a stack spans backend and frontend, merge backend PRs before frontend PRs so proxy routes and API contracts land first (see #50).
-6. **Continue** — pick the next issue or checklist row until the slice is complete or you are blocked (document blockers in issue/PR).
+2. **Scope gate** — open or claim a GitHub issue for each unit before non-trivial work.
+3. **Register gaps** — if you find debt or a blocker you cannot fix in the current slice, open a GitHub issue (`source:ai`) in **this repo only**.
+4. **Fix → verify → ship** — work subagents implement and verify locally; coordinator re-runs gates on combined tree, runs security-review when triggered, then spawns one ship subagent to commit, push, and open or update PR once (`Fixes #N` / `Refs #N`). Solo agent (no delegation) owns ship directly. **Done** includes published PR unless explicit PO skip; user-level IDE commit-only rules MUST NOT override ship-by-default.
+5. **Merge when CI green** — squash-merge to `main` when required checks pass, unless the PO said "do not merge". Ship subagent (or coordinator fallback) owns loop-on-ci after push until green or blocked.
+6. **Rebase stacked PRs** — immediately update dependent branches onto `main`. **Merge order:** foundation/lowest stack PR first, then dependents top-down. When a stack spans backend and frontend, merge backend PRs before frontend PRs so proxy routes and API contracts land first (see #50).
+7. **Continue** — pick the next issue or checklist row until the slice is complete or blocked (document blockers; register debt before PO escalation on secrets).
 
 The scope gate applies to each unit of work; the work loop governs sequencing across units.
 
@@ -193,6 +234,44 @@ When open revamp issues = 0 (or only operator-blocked, e.g. #34 password rotatio
 
 E2E lives in `tests/e2e/`; local runner `./bin/run-e2e.sh`; CI workflow `.github/workflows/e2e.yml` (scheduled + `workflow_dispatch`, not a required PR gate until stable).
 
+## Subagent delegation
+
+When the PO lists **multiple separate issues or tasks**, the coordinating agent MUST spawn **one subagent per issue**. Never assign one subagent multiple PO-listed items.
+
+**Example:** PO says "fix login bug and add export button" → scope gate per issue → work subagent A (login only) + work subagent B (export only), parallel when independent; coordinator synthesizes, integration-verifies combined tree, security-reviews if triggered, spawns one ship subagent; coordinator MUST NOT ship directly.
+
+Work subagents return done (verification evidence) or structured blockers. They MUST NOT commit, push, or open PRs when a coordinator is active. Coordinator owns scope gate, sequencing, file-conflict avoidance, integration verification, PO-facing summary, and spawning the ship subagent.
+
+Skill reference: [.cursor/skills/flows-coordinator/SKILL.md](.cursor/skills/flows-coordinator/SKILL.md).
+
+## Skill and subagent routing
+
+| Trigger | Use |
+| --- | --- |
+| PO lists 2+ separate tasks | flows-coordinator skill; one subagent per issue |
+| GitHub issues, PRs, checks, merge | gh-cli skill |
+| Ship after verified work (solo agent or coordinator synthesis) | ce-commit-push-pr skill as ship subagent (skip only on explicit PO skip signals) |
+| Substantial or risky diff before PR | ce-code-review or code-reviewer subagent |
+| Security review requested or security surface changed (see MUST triggers) | review-security skill or security-review subagent (readonly); MUST after synthesis, before ship subagent |
+| Test failure or bug | ce-debug or systematic-debugging skill |
+| Prior learning in `docs/solutions/` | ce-learnings-researcher skill |
+| PR CI failing after push | fix-ci or loop-on-ci skill — ship subagent owns |
+
+**MUST triggers for `security-review` before merge:** auth middleware; API keys or secrets handling; public unauthenticated endpoints; PII handling; payment flows; issues labeled `type:security`.
+
+Agents MUST pick the matching row; MUST NOT ask the PO to choose libraries or paths.
+
+## Issue registration
+
+When debt, follow-up, or cross-track work is found outside the current slice, agents MUST open a GitHub issue in **this repo** and MUST NOT expand scope silently. Do not file flows upstream issues from Nordpool work.
+
+1. **Create** — `gh issue create` or debt/feature/bug template under `.github/ISSUE_TEMPLATE/`.
+2. **Labels** — `source:ai` + `type:debt|bug|feature|docs|security` + `priority:p0`–`p2` when known.
+3. **Body** — user story, dev story, **Found during:** `#N` or PR, **Suggested owner:** Dev | QA | DevOps | security follow-up.
+4. **Report** — `Debt filed: #N` in PR or coordinator summary.
+
+**MAY fix inline:** typos in files already touched in the same PR.
+
 ## Agent roles
 
 | Role | Owns | Exit criteria |
@@ -201,15 +280,29 @@ E2E lives in `tests/e2e/`; local runner `./bin/run-e2e.sh`; CI workflow `.github
 | AI QA | Golden harness, smoke scripts | CI green, evidence in PR |
 | AI DevOps | CI, compose, Coolify runbooks | required checks on PR |
 
+Log shipped work in `PROGRESS_LOG.md` (brief entries, date + PR + issue #).
+
+## Docs hierarchy
+
+| Doc | Use |
+| --- | --- |
+| `STRATEGY.md` | Why and where we invest |
+| `docs/plans/*` | Feature and workflow plans |
+| `docs/improvement-backlog.md` | Prioritized ideas |
+| `docs/review-debt-register.md` | Tech debt index |
+| `documentation/project_planning.md` | Legacy product planning reference |
+
 ## Issue tracker
 
 **Live tracker:** https://github.com/alicemq/lt-electricity-full-price-nordpool/issues
+
+**Index:** `docs/review-debt-register.md`
 
 | Label | Use |
 | --- | --- |
 | `source:human` | Owner request |
 | `source:ai` | Agent-found debt |
-| `type:debt` / `type:feature` / `type:bug` / `type:docs` | Kind of work |
+| `type:debt` / `type:feature` / `type:bug` / `type:docs` / `type:security` | Kind of work |
 | `priority:p0`–`p2` | Urgency |
 
 ## Revamp phases (flows nordpool checklist)
@@ -220,7 +313,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 
 | Phase | Focus | This repo |
 | --- | --- | --- |
-| UA0 | Hygiene, AGENTS.md, gitignore, issue templates | **In progress** (#2) |
+| UA0 | Hygiene, AGENTS.md, gitignore, issue templates | **In progress** (#2, #115) |
 | UA1 | `/ready`, env single source, nginx alignment | Follow-up |
 | UA2 | CI fixture DB, integration tests | Done (#4) — `database/fixtures/ci_seed.sql`, golden runner, `ci-integration.yml` |
 | UA3+ | OpenAPI repair, golden tests, sync split, PWA | Planned |
@@ -230,3 +323,5 @@ Checklist source: `vendor/flows/examples/nordpool-revamp-checklist.md` (read-onl
 ## Writing style
 
 Avoid em dashes and filler in docs and commits. Prefer plain, verifiable statements.
+
+Agents MUST match the user's language and MUST NOT switch language unless the user explicitly asks. Installed via `.cursor/rules/language-matching.mdc` from flows `install.sh`.

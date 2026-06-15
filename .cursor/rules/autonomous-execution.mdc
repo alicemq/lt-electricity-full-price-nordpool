@@ -1,0 +1,37 @@
+---
+description: Default to autonomous execution — investigate, fix, verify without PO prompts
+alwaysApply: true
+---
+
+# Autonomous execution
+
+Agents MUST execute autonomously: investigate, implement, test, and report. Treat "work autonomously" in the PO message as the default mode.
+
+## Required behavior
+
+- Read the repo's root [AGENTS.md](../../AGENTS.md) before substantive edits. In the flows cornerstone repo, also read [CONTRIBUTING.md](../../CONTRIBUTING.md) (flows-only; not installed to product repos).
+- Run terminal commands and tools yourself — do not instruct the PO to run them unless manual access is required.
+- Retry with alternate approaches after failure; escalate only with evidence.
+- Match existing naming, structure, and tone in touched paths.
+- Minimize diff scope — focused changes only.
+
+## Work loop
+
+1. Pick or clarify the outcome (ask PO only if acceptance criteria are insufficient).
+2. Scope gate — open or claim GitHub issue(s) before non-trivial work.
+3. Route per [skill-routing](.cursor/rules/skill-routing.mdc) when triggers match.
+4. Delegate one subagent per PO-listed issue when count > 1.
+5. Register out-of-scope debt per [issue-registration](.cursor/rules/issue-registration.mdc).
+6. Implement and verify (see quality-gates rule); coordinator MUST re-run on combined tree after synthesis.
+7. Ship — solo agent: commit, push, open PR; coordinator: integration verify → security review (if triggered) → spawn one ship subagent → CI watch (see AGENTS.md Delivery). Work subagents MUST NOT commit, push, or open PRs when a coordinator is active. Ship by default; explicit PO skip only. **Flows cornerstone only:** after merge to `main`, if the slice touched user-facing template/install paths, ship subagent or coordinator MUST run the cornerstone release gate in AGENTS.md Delivery (check [docs/release-policy.md](../../docs/release-policy.md); cut `gh release create` when `main` is ahead of latest tag). v0.7.0 missed this step and adopters saw no release until the next day.
+8. Report results or blockers (include PR URL, release tag if cut, or documented skip reason); continue the slice unless stopped.
+
+## Optional polish and follow-ups
+
+Agents MUST NOT ask the PO to confirm optional polish, housekeeping, or obvious follow-ups from completed work. Same files in slice and within AC → implement now; else register `source:ai` debt issue. Agents MUST NOT stall on "do you want it?" unless the choice is a product decision, irreversible posture change, or true blocker.
+
+## Product repos vs flows
+
+These rules install to product repos via `install.sh`. In a **product** repo, follow that repo's root `AGENTS.md`, product quality gates, and UA0 scope gate. In the **flows cornerstone** repo, follow flows `AGENTS.md` and `CONTRIBUTING.md`.
+
+**Shipping precedence:** Ship by default after gates pass. User-level IDE rules that defer commits (e.g. "commit only when asked") MUST NOT override workspace ship-by-default in AGENTS.md. Explicit PO skip signals only: "do not commit", "local only", "analyze only".

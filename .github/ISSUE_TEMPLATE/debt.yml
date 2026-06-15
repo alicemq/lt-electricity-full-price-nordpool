@@ -1,14 +1,15 @@
-name: Feature or idea
-description: New feature, enhancement, or product idea (required before implementation)
-title: "[type:feature] "
+name: Tech debt or follow-up
+description: Agent-found or deferred work — register for a separate slice (required before picking up)
+title: "[type:debt] "
 labels:
-  - type:feature
+  - type:debt
+  - source:ai
 body:
   - type: markdown
     attributes:
       value: |
-        Required before implementation. See **AGENTS.md** scope gate.
-        Every PR for this work must reference this issue (`Fixes #N`).
+        Register debt or follow-up work found during another slice. See **AGENTS.md** issue registration.
+        Do not implement in the parent PR unless PO explicitly expands scope.
   - type: textarea
     id: user_story
     attributes:
@@ -21,22 +22,22 @@ body:
     id: dev_story
     attributes:
       label: Dev story
-      description: Technical scope, modules/files, acceptance criteria, out of scope.
+      description: Scope, acceptance criteria, out of scope, suggested owner role.
       placeholder: |
-        **Scope:** services/api, services/frontend, …
+        **Scope:** …
         **Acceptance criteria:**
         - [ ] …
         **Out of scope:**
         - …
+        **Suggested owner:** AI Developer | AI QA | AI DevOps | security follow-up
     validations:
       required: true
-  - type: dropdown
-    id: source
+  - type: input
+    id: found_during
     attributes:
-      label: Source
-      options:
-        - source:human
-        - source:ai
+      label: Found during
+      description: Parent issue or PR where this was discovered (e.g. #42 or PR URL).
+      placeholder: "#42"
     validations:
       required: true
   - type: dropdown

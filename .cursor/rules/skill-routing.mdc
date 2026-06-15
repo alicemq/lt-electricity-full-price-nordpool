@@ -1,0 +1,44 @@
+---
+description: When to use Cursor skills and specialized subagents vs default engineering
+alwaysApply: true
+---
+
+# Skill and subagent routing
+
+Canonical detail: [AGENTS.md](../../AGENTS.md) sections **Skill and subagent routing** and **Issue registration**.
+
+## Engineering roles (default)
+
+| Situation | Role | Action |
+| --- | --- | --- |
+| Single scoped issue | Solo agent wears Dev + QA + DevOps + ship | Implement, verify, then commit/push/PR per quality gates |
+| PO lists 2+ separate issues | Coordinator + work subagents + ship subagent | Scope gate → one work subagent per issue → integration verify → security review → one ship subagent |
+| Parallel independent work | Work subagents (`generalPurpose`, `explore`, `shell`) | Launch concurrently when paths do not conflict; verify only, no per-subagent PRs |
+
+## Specialized skills and subagents
+
+| Trigger | Use | When NOT to use |
+| --- | --- | --- |
+| PO lists multiple separate tasks | flows-coordinator skill | Single-issue work |
+| GitHub issues, PRs, checks, merge | gh-cli skill (`gh` in shell) | Pure local code edits with no GitHub action |
+| Ship after verified work (solo or coordinator) | ce-commit-push-pr skill (ship subagent) | Work subagents when coordinator active; explicit PO skip signals only |
+| Substantial diff before PR | ce-code-review skill or `code-reviewer` subagent | Trivial one-line fixes |
+| PO asks for security review | review-security skill + `security-review` subagent (readonly) | Non-security changes |
+| Diff touches security surface (see MUST triggers below) | `security-review` subagent (readonly) | MUST run after synthesis on combined diff, before ship subagent |
+| Test failure or unexpected behavior | ce-debug or systematic-debugging skill | Before proposing fixes |
+| Work in area covered by `docs/solutions/` | ce-learnings-researcher skill | Greenfield with no prior learning |
+| PR CI failing after push | fix-ci or loop-on-ci skill | Ship subagent owns; coordinator MAY own if ship subagent cannot loop |
+| PO asks Bugbot-style review | review-bugbot skill + `bugbot` subagent (readonly) | Routine self-review |
+
+**MUST triggers for `security-review` before merge:** auth middleware; API keys or secrets handling; public unauthenticated endpoints; PII handling; payment flows; issues labeled `type:security`.
+
+## Coordinator duties
+
+- Scope gate: open or claim issues before delegation.
+- Pick the skill or subagent type from the table; do not ask the PO to choose implementation libraries.
+- Register out-of-scope findings per issue-registration rule; do not expand the current slice.
+- Synthesize work subagent outputs in outcome language for the PO.
+- Re-run quality gates on combined tree after synthesis.
+- Run security-review when triggered, before ship subagent.
+- Spawn one ship subagent after partial-ship rules pass; MUST NOT commit/push/PR directly when work subagents were spawned.
+- Ship subagent (or coordinator fallback) owns loop-on-ci after push.
