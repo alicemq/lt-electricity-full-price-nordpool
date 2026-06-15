@@ -257,9 +257,10 @@ paths:
         - DST-aware timestamp handling
         - Optimized database queries
         
-        **Data source:** Primary ingestion is the background sync worker. When the database
-        is empty or incomplete for the requested date, this endpoint may perform a one-time
-        backup fetch from the Elering API before responding (see issue #11 for demotion plan).
+        **Data source:** Primary ingestion is the background sync worker during the Nordpool
+        release window. When the database is empty or incomplete, this endpoint may perform a
+        one-time backup fetch from the Elering API (outside the release window only). Response
+        `meta.dataSource` indicates `db`, `vendor_backup`, or `partial`.
         
         **Usage Examples:**
         - Single day: `?date=2025-06-26&country=lt`
@@ -340,6 +341,15 @@ paths:
                       total_records:
                         type: integer
                         example: 24
+                      dataSource:
+                        type: string
+                        enum: [db, vendor_backup, partial]
+                        description: 'How the response was assembled'
+                        example: db
+                      releaseWindowActive:
+                        type: boolean
+                        description: 'True when Nordpool release window is active'
+                        example: false
                       date_range:
                         type: object
                         properties:
