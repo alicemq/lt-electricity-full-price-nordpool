@@ -81,7 +81,10 @@ describe('TodayView smoke', () => {
     const wrapper = mount(TodayView, {
       global: {
         stubs: {
-          VueDatePicker: true,
+          VueDatePicker: {
+            template: '<input class="date-picker-stub" :value="modelValue" readonly />',
+            props: ['modelValue'],
+          },
           PriceTable: {
             template: '<div class="price-table-stub">{{ priceData.length }}</div>',
             props: ['priceData'],
@@ -93,6 +96,38 @@ describe('TodayView smoke', () => {
     await flushPromises();
     await flushPromises();
     expect(wrapper.find('.price-table-stub').text()).toBe('3');
+    expect(wrapper.find('.date-picker-stub').element.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('keeps selected date visible when API returns no prices', async () => {
+    const { fetchPrices } = await import('../src/services/priceService.js');
+    fetchPrices.mockResolvedValueOnce({
+      success: true,
+      data: { lt: [] },
+      meta: { country: 'lt', count: 0, timezone: 'Europe/Vilnius' },
+    });
+
+    const TodayView = (await import('../src/views/TodayView.vue')).default;
+    const wrapper = mount(TodayView, {
+      global: {
+        stubs: {
+          VueDatePicker: {
+            template: '<input class="date-picker-stub" :value="modelValue" readonly />',
+            props: ['modelValue'],
+          },
+          PriceTable: {
+            template: '<div class="price-table-stub" data-empty="true"></div>',
+            props: ['priceData'],
+          },
+        },
+        mocks: { $t: (key) => key },
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find('.date-picker-stub').element.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(wrapper.find('[data-empty="true"]').exists()).toBe(true);
   });
 });
 

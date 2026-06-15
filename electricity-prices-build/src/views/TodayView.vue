@@ -1,6 +1,6 @@
 <script setup>
 
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 
 import { useRoute, onBeforeRouteLeave } from 'vue-router'
 
@@ -36,27 +36,35 @@ const route = useRoute();
 
 
 
-function resolveInitialDate() {
+function formatDisplayDate(value) {
 
-  const queryDate = route.query.date;
-
-  if (typeof queryDate === 'string' && moment.tz(queryDate, DISPLAY_TIMEZONE).isValid()) {
-
-    return moment.tz(queryDate, DISPLAY_TIMEZONE).startOf('day').toDate();
-
-  }
-
-  return moment().tz(DISPLAY_TIMEZONE).startOf('day').toDate();
+  return moment.tz(value, DISPLAY_TIMEZONE).format('YYYY-MM-DD');
 
 }
 
 
 
-const date = ref(resolveInitialDate());
+function resolveInitialDateStr() {
 
-const minDate = moment.tz('2012-07-01', DISPLAY_TIMEZONE).startOf('day').toDate();
+  const queryDate = route.query.date;
 
-const maxDate = moment().tz(DISPLAY_TIMEZONE).add(1, 'day').startOf('day').toDate();
+  if (typeof queryDate === 'string' && moment.tz(queryDate, DISPLAY_TIMEZONE).isValid()) {
+
+    return formatDisplayDate(queryDate);
+
+  }
+
+  return formatDisplayDate(moment().tz(DISPLAY_TIMEZONE));
+
+}
+
+
+
+const selectedDate = ref(resolveInitialDateStr());
+
+const minDate = '2012-07-01';
+
+const maxDate = computed(() => formatDisplayDate(moment().tz(DISPLAY_TIMEZONE).add(1, 'day')));
 
 const priceData = ref([]);
 
@@ -69,6 +77,14 @@ const error = ref(null);
 let refreshTimeout = null;
 
 let unsubscribePrices = null;
+
+
+
+function selectedDateAsDate() {
+
+  return moment.tz(selectedDate.value, DISPLAY_TIMEZONE).startOf('day').toDate();
+
+}
 
 
 
@@ -138,7 +154,7 @@ async function reloadPrices() {
 
     error.value = null;
 
-    const data = await fetchPrices(date.value);
+    const data = await fetchPrices(selectedDateAsDate());
 
     priceData.value = data.data?.lt || [];
 
@@ -197,7 +213,7 @@ onUnmounted(() => {
 
 
 
-watch(date, () => {
+watch(selectedDate, () => {
 
   reloadPrices();
 
@@ -224,7 +240,7 @@ function updateTodaySEO() {
 
       : 'Display Nord Pool electricity prices with all applicable taxes and fees. Prices are updated automatically.');
 
-  const dateStr = moment(date.value).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD');
+  const dateStr = selectedDate.value;
 
   const path = `/today?date=${dateStr}`;
 
@@ -272,7 +288,7 @@ function updateTodaySEO() {
 
 
 
-watch([priceData, date], () => {
+watch([priceData, selectedDate], () => {
 
   updateTodaySEO();
 
@@ -282,7 +298,7 @@ watch([priceData, date], () => {
 
 function setToday() {
 
-  date.value = moment().tz(DISPLAY_TIMEZONE).startOf('day').toDate();
+  selectedDate.value = formatDisplayDate(moment().tz(DISPLAY_TIMEZONE));
 
 }
 
@@ -290,7 +306,7 @@ function setToday() {
 
 function setTomorrow() {
 
-  date.value = moment().tz(DISPLAY_TIMEZONE).add(1, 'day').startOf('day').toDate();
+  selectedDate.value = formatDisplayDate(moment().tz(DISPLAY_TIMEZONE).add(1, 'day'));
 
 }
 
@@ -306,7 +322,9 @@ function setTomorrow() {
 
       <div class="d-flex gap-2 mb-3">
 
-        <VueDatePicker v-model="date" locale="lt" month-name-format="long" format="yyyy-MM-dd"
+        <VueDatePicker v-model="selectedDate" locale="lt" month-name-format="long" format="yyyy-MM-dd"
+
+          model-type="yyyy-MM-dd" :timezone="DISPLAY_TIMEZONE"
 
           auto-apply reverse-years :enable-time-picker="false"
 
@@ -369,5 +387,4 @@ function setTomorrow() {
 }
 
 </style>
-
 

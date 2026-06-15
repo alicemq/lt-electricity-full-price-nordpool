@@ -73,8 +73,8 @@ onUnmounted(() => {
 const averagePrice = computed(() => {
   // Use allPriceData for average calculation if provided, otherwise use priceData
   const dataToUse = props.allPriceData || props.priceData;
-  
-  if (!dataToUse.length) return 0;
+
+  if (!hasEnoughData.value || !dataToUse.length) return null;
   const sum = dataToUse.reduce((acc, price) => acc + parseFloat(calculatePrice(price)), 0);
   return sum / dataToUse.length;
 });
@@ -221,7 +221,7 @@ const groupedByHour = computed(() => {
           <th :colspan="layoutMode === 'slot' ? 0 : slotsPerHour * 2" class="text-end sticky-top bg-body">
             <div class="d-flex align-items-center justify-content-end gap-2">
               <span class="fw-bold mb-0">{{ $t('table.averageLabel') }}</span>
-              <span class="badge bg-primary">{{ averagePrice.toFixed(3) }} ct/kWh</span>
+              <span v-if="averagePrice != null" class="badge bg-primary">{{ averagePrice.toFixed(3) }} ct/kWh</span>
             </div>
           </th>
         </tr>
