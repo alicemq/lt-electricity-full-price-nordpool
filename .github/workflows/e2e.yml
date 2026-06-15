@@ -25,6 +25,7 @@ jobs:
       - name: Start dev stack
         env:
           POSTGRES_PASSWORD: ci_password_change_me
+          NODE_ENV: development
         run: |
           cp -n deploy/local.env.example deploy/local.env 2>/dev/null || true
           docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build db backend frontend
@@ -38,7 +39,11 @@ jobs:
             curl -sf http://127.0.0.1:3000/health && break
             sleep 2
           done
-          curl -sf http://127.0.0.1:3000/health || (echo "backend failed to start" && exit 1)
+          curl -sf http://127.0.0.1:3000/health || (
+            echo "backend failed to start; container logs:"
+            docker compose -f docker-compose.yml -f docker-compose.dev.yml logs --no-color backend
+            exit 1
+          )
           for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:5173/ >/dev/null && break
             sleep 2
