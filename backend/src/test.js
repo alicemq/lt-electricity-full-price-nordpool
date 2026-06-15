@@ -25,6 +25,7 @@ import {
 } from './lib/prices/backupFetchPolicy.js';
 import { hashManageToken, createManageToken } from './push/tokens.js';
 import { getVapidConfig, isPushConfigured } from './push/vapid.js';
+import { buildHealthResponse } from './lib/healthResponse.js';
 
 let passed = 0;
 let failed = 0;
@@ -228,6 +229,31 @@ test('isPushConfigured is false without VAPID env', () => {
 test('getVapidConfig defaults subject', () => {
   const config = getVapidConfig();
   assert.equal(config.subject, 'mailto:ops@example.com');
+});
+
+test('buildHealthResponse returns degraded when system health reports error', () => {
+  const response = buildHealthResponse({
+    health: { error: 'ECONNREFUSED' },
+    stats: { error: 'ECONNREFUSED' },
+    syncStatus: { isRunning: false, scheduledJobs: null },
+  });
+  assert.equal(response.overallStatus, 'degraded');
+  assert.equal(response.success, false);
+  assert.equal(response.system.uptime, 'unknown');
+  assert.ok(response.issues.some((issue) => issue.includes('ECONNREFUSED')));
+  assert.ok(response.issues.some((issue) => issue.includes('Database connection failed')));
+});
+
+test('buildHealthResponse guards missing nested health fields', () => {
+  const response = buildHealthResponse({
+    health: { database: { connected: false }, sync: {}, system: {} },
+    stats: { error: 'unavailable' },
+    syncStatus: { isRunning: true, scheduledJobs: [] },
+  });
+  assert.equal(response.overallStatus, 'degraded');
+  assert.equal(response.success, true);
+  assert.deepEqual(response.dataFreshness, []);
+  assert.ok(response.issues.includes('Database connection failed'));
 });
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);

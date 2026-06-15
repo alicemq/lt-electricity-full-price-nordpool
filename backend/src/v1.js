@@ -19,6 +19,7 @@ import {
   updateCronSchedule,
 } from './lib/admin/cronSchedules.js';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getLatestTimestamp, logSync, getAllEarliestTimestamps, getInitialSyncStatus, getDatabaseStats, getSystemHealth, getAllCountrySyncStatus } from './database.js';
+import { buildHealthResponse } from './lib/healthResponse.js';
 import pool from './database.js';
 import { createPushRouter } from './push/router.js';
 import { createPushAdminRouter } from './push/adminRouter.js';
@@ -1007,65 +1008,27 @@ router.get('/health', async (req, res) => {
     const stats = await getDatabaseStats();
     const syncStatus = syncWorker.getStatus();
     const countrySyncStatus = await getAllCountrySyncStatus();
-    
-    const response = {
-      success: true,
-      timestamp: new Date().toISOString(),
-      system: {
-        ...health.system,
-        uptime: Math.floor(health.system.uptime / 3600) + ' hours'
-      },
-      database: {
-        ...health.database,
-        stats: {
-          totalRecords: stats.totalRecords,
-          countries: stats.countries,
-          databaseSize: stats.databaseSize,
-          tableSizes: stats.tableSizes
-        }
-      },
-      sync: {
-        ...health.sync,
-        worker: syncStatus,
-        recentActivity: stats.recentSyncs,
-        statistics: stats.syncStats,
-        countrySyncStatus: countrySyncStatus
-      },
-      scheduledJobs: syncStatus.scheduledJobs,
-      dataFreshness: health.sync.dataFreshness
-    };
-    
     const isInActivePeriod = isInReleaseWindow();
-    
-    // Add overall health status
-    const isHealthy = health.database.connected && 
-                     health.sync.dataFreshness.every(country => country.isRecent);
-    
-    response.overallStatus = isHealthy ? 'healthy' : 'degraded';
-    response.issues = [];
-    
-    if (!health.database.connected) {
-      response.issues.push('Database connection failed');
-    }
-    
-    const staleData = health.sync.dataFreshness.filter(country => !country.isRecent);
-    if (staleData.length > 0) {
-      response.issues.push(`Stale data detected: ${staleData.map(c => `${c.country.toUpperCase()} (${c.hoursOld}h old)`).join(', ')}`);
-    }
-    
-    // Only report sync worker issues during active period
-    if (!syncStatus.isRunning && isInActivePeriod) {
-      response.issues.push('Sync worker not running');
-    }
-    
-    res.json(response);
+
+    const response = buildHealthResponse({
+      health,
+      stats,
+      syncStatus,
+      requireSyncWorker: false,
+      isInActivePeriod,
+      syncExtras: { countrySyncStatus },
+    });
+
+    res.status(200).json(response);
   } catch (error) {
     console.error('Error getting health status:', error);
-    res.status(500).json({
+    res.status(200).json({
       success: false,
       error: 'Failed to get health status',
       details: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      overallStatus: 'degraded',
+      issues: ['Failed to get health status'],
     });
   }
 });
