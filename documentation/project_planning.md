@@ -286,18 +286,14 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.d
 ```
 
 ### **Manual Data Sync**
+Sync runs inside the backend container via `backend/src/syncWorker.js` and the CLI:
+
 ```bash
-# Production mode
-docker-compose run data-sync
-
-# Development mode
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml run data-sync
-
-# Sync specific country
-docker-compose run data-sync lt
+# Sync specific country (last 7 days)
+docker compose exec backend npm run cli -- lt
 
 # Historical sync
-docker-compose run data-sync historical lt 2024-01-01 2024-12-31
+docker compose exec backend npm run cli -- historical lt 2024-01-01 2024-12-31
 ```
 
 ### **API Testing**
