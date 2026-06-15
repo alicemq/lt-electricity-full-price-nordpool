@@ -14,8 +14,8 @@ A modern, containerized electricity price monitoring system for Baltic countries
 
 #### **Production Mode (Recommended)**
 ```bash
-# Clone the repository
-git clone <repository-url>
+# Clone the repository (includes vendor/flows read-only handbook submodule)
+git clone --recurse-submodules <repository-url>
 cd LT-electricity-full-price-NordPool
 
 # First run: copy .env.example to .env.production and set POSTGRES_PASSWORD (or use ./scripts/prod.sh)
