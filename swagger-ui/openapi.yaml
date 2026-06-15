@@ -1,34 +1,34 @@
 openapi: 3.0.3
 info:
-  title: 'Electricity Prices NordPool API'
-  version: '1.0.0'
+  title: Electricity Prices NordPool API
+  version: 1.0.0
   description: |
     # Electricity Prices NordPool API
-    
+
     Comprehensive API for accessing electricity price data from NordPool via Elering API.
-    
+
     ## Features
     - **Multi-country support**: Lithuania (LT), Estonia (EE), Latvia (LV), Finland (FI)
     - **DST-aware timestamps**: Proper handling of daylight saving time transitions
     - **Historical data**: Access to price data from 2012-07-01 to present
     - **Real-time updates**: Latest clearing prices from NordPool
     - **Secure architecture**: All requests routed through frontend proxy
-    
+
     ## Architecture
     - **Production**: All API calls go through frontend proxy at `/api/v1/*`
     - **Development**: Direct backend access available for debugging
     - **Security**: Backend services not exposed to internet
-    
+
     ## Data Sources
     - **Primary**: Elering API (https://dashboard.elering.ee/api/nps/price)
     - **Storage**: PostgreSQL database with optimized queries
     - **Sync**: Automated every 30 minutes during NordPool hours
-    
+
     ## Timezone Handling
     - **Market timezone**: Europe/Vilnius (CET/CEST)
     - **NordPool boundaries**: 22:00 UTC to 21:59 UTC
     - **DST conversion**: Automatic handling of daylight saving time
-    
+
     ## Rate Limits
     - **No current limits**: API designed for public access
     - **Caching**: Database-based caching for optimal performance
@@ -40,34 +40,32 @@ info:
     `Deprecation: true`, `Link: </api/v1/...>; rel="successor-version"`, and
     `Warning: 299 - "Legacy /api/* path; use /api/v1/*"`. Prefer `/api/v1/*` for new integrations.
     See `documentation/legacy-api.md` for details.
-    
   contact:
-    name: 'Electricity Prices Team'
-    url: 'https://github.com/alicemq/lt-electricity-full-price-nordpool'
+    name: Electricity Prices Team
+    url: https://github.com/alicemq/lt-electricity-full-price-nordpool
   license:
-    name: 'AGPL-3.0-only'
-    url: 'https://www.gnu.org/licenses/agpl-3.0.html'
-  externalDocs:
-    description: 'Project Documentation'
-    url: 'https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/README.md'
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.html
 servers:
   - url: /api/v1
-    description: 'Production API Server (via proxy)'
-  - url: 'http://localhost:3000/api/v1'
-    description: 'Development API Server'
-  - url: 'http://backend:3000/api/v1'
-    description: 'Docker Internal API Server'
+    description: Production API Server (via proxy)
+  - url: http://localhost:3000/api/v1
+    description: Development API Server
+  - url: http://backend:3000/api/v1
+    description: Docker Internal API Server
 paths:
   /health:
     get:
-      summary: 'Comprehensive health check'
-      description: |
-        Returns system health, database statistics, sync status, scheduled jobs, and chunked sync progress. Useful for monitoring and diagnostics.
+      operationId: getHealth
+      summary: Comprehensive health check
+      description: >
+        Returns system health, database statistics, sync status, scheduled jobs, and chunked sync progress. Useful for
+        monitoring and diagnostics.
       tags:
         - Health
       responses:
         '200':
-          description: 'System health and status'
+          description: System health and status
           content:
             application/json:
               schema:
@@ -90,39 +88,110 @@ paths:
                     type: array
                     items:
                       type: object
+                      additionalProperties: true
                   dataFreshness:
                     type: array
                     items:
                       type: object
+                      additionalProperties: true
                   issues:
                     type: array
                     items:
                       type: string
               example:
                 success: true
-                overallStatus: 'healthy'
+                overallStatus: healthy
                 timestamp: '2025-06-26T21:25:01.094Z'
-                system: { nodeVersion: 'v20.19.3', platform: 'linux', uptime: '12 hours' }
-                database: { connected: true, uptime: '1 day', activeConnections: 5, stats: { totalRecords: 123456 } }
-                sync: { initialSync: { isComplete: true }, lastSync: { sync_type: 'initial_sync', status: 'completed' } }
-                scheduledJobs: [ { name: 'All Countries NordPool Sync', schedule: '30,0 12-17 * * *' } ]
-                dataFreshness: [ { country: 'lt', isRecent: true } ]
+                system:
+                  nodeVersion: v20.19.3
+                  platform: linux
+                  uptime: 12 hours
+                database:
+                  connected: true
+                  uptime: 1 day
+                  activeConnections: 5
+                  stats:
+                    totalRecords: 123456
+                sync:
+                  initialSync:
+                    isComplete: true
+                  lastSync:
+                    sync_type: initial_sync
+                    status: completed
+                scheduledJobs:
+                  - name: All Countries NordPool Sync
+                    schedule: 30,0 12-17 * * *
+                dataFreshness:
+                  - country: lt
+                    isRecent: true
                 issues: []
         '500':
-          description: 'Failed to get health status'
+          description: Failed to get health status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ready:
+    get:
+      operationId: getReady
+      summary: Readiness probe
+      description: |
+        Returns 200 when Postgres is reachable and at least one country has price data within 24 hours.
+        Returns 503 otherwise. See docs/ops/ready-slo.md.
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service ready for traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - checks
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ready
+                  checks:
+                    type: object
+                    properties:
+                      postgres:
+                        type: boolean
+                      price_data_fresh:
+                        type: boolean
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - checks
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - not_ready
+                  checks:
+                    type: object
+                    properties:
+                      postgres:
+                        type: boolean
+                      price_data_fresh:
+                        type: boolean
   /countries:
     get:
-      summary: 'Get available countries'
-      description: 'Retrieve list of available countries for price data'
+      summary: Get available countries
+      description: Retrieve list of available countries for price data
       tags:
         - Countries
       responses:
         '200':
-          description: 'List of available countries'
+          description: List of available countries
           content:
             application/json:
               schema:
@@ -137,18 +206,19 @@ paths:
               example:
                 success: true
                 data:
-                  - code: 'lt'
-                    name: 'Lithuania'
-                  - code: 'ee'
-                    name: 'Estonia'
-                  - code: 'lv'
-                    name: 'Latvia'
-                  - code: 'fi'
-                    name: 'Finland'
+                  - code: lt
+                    name: Lithuania
+                  - code: ee
+                    name: Estonia
+                  - code: lv
+                    name: Latvia
+                  - code: fi
+                    name: Finland
+      operationId: getCountries
   /nps/price/{country}/latest:
     get:
-      summary: 'Get latest price for a country'
-      description: 'Get the most recent electricity price for a specific country'
+      summary: Get latest price for a country
+      description: Get the most recent electricity price for a specific country
       tags:
         - Prices
       parameters:
@@ -157,11 +227,16 @@ paths:
           required: true
           schema:
             type: string
-            enum: [lt, ee, lv, fi, all]
-          description: 'Country code (case insensitive) or "all" for all countries'
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
+              - all
+          description: Country code (case insensitive) or "all" for all countries
       responses:
         '200':
-          description: 'Latest price data'
+          description: Latest price data
           content:
             application/json:
               schema:
@@ -176,29 +251,33 @@ paths:
               example:
                 data:
                   - timestamp: 1750885200
-                    price: 75.0
-                    country: 'LT'
+                    price: 75
+                    country: LT
                 meta:
-                  countries: ['LT']
+                  countries:
+                    - LT
                   date: '2025-06-26'
                   hour: '00:00'
-                  timezone: 'Europe/Vilnius'
+                  timezone: Europe/Vilnius
                   timestamp_local: 1750885200
-                  price_unit: 'EUR/MWh'
-                  data_type: 'latest_published'
+                  price_unit: EUR/MWh
+                  data_type: latest_published
         '404':
-          description: 'No price data found'
+          description: No price data found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      operationId: getNpsPriceCountryLatest
   /nps/price/{country}/current:
     get:
-      summary: 'Get current interval price for a country'
-      description: |
+      summary: Get current interval price for a country
+      description: >
         Get electricity price for the current market time unit (MTU) in Europe/Vilnius timezone.
 
-        The API returns the latest available slot up to "now", regardless of whether the underlying data is in legacy 60-minute resolution or new 15-minute MTU.
+
+        The API returns the latest available slot up to "now", regardless of whether the underlying data is in legacy
+        60-minute resolution or new 15-minute MTU.
       tags:
         - Prices
       parameters:
@@ -207,11 +286,16 @@ paths:
           required: true
           schema:
             type: string
-            enum: [lt, ee, lv, fi, all]
-          description: 'Country code (case insensitive) or "all" for all countries'
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
+              - all
+          description: Country code (case insensitive) or "all" for all countries
       responses:
         '200':
-          description: 'Current interval price data'
+          description: Current interval price data
           content:
             application/json:
               schema:
@@ -234,54 +318,78 @@ paths:
               example:
                 data:
                   - timestamp: 1750885200
-                    price: 75.0
-                    country: 'LT'
+                    price: 75
+                    country: LT
                 meta:
-                  countries: ['LT']
+                  countries:
+                    - LT
                   date: '2025-06-26'
                   hour: '00:00'
-                  timezone: 'Europe/Vilnius'
+                  timezone: Europe/Vilnius
                   timestamp_local: 1750885200
-                  price_unit: 'EUR/MWh'
-                  data_type: 'current_interval'
+                  price_unit: EUR/MWh
+                  data_type: current_hour
                   current_time_local: '2025-06-26 00:15:30'
                   is_current_hour: true
         '404':
-          description: 'No price data found for current hour'
+          description: No price data found for current hour
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      operationId: getNpsPriceCountryCurrent
   /nps/prices:
     get:
-      summary: 'Get price data for date or date range'
-      description: |
+      summary: Get price data for date or date range
+      description: >
         Retrieve electricity prices for a specific date or date range.
-        
+
+
         **Features:**
+
         - Single date or date range queries
+
         - Multi-country support (LT, EE, LV, FI)
+
         - DST-aware timestamp handling
+
         - Optimized database queries
-        
+
+
         **Data source:** Primary ingestion is the background sync worker during the Nordpool
+
         release window (12:45–15:55 Europe/Paris). When the database is empty or incomplete,
+
         this endpoint may perform a rate-limited backup fetch from the Elering API **outside**
+
         the release window. Pass `allow_backup=1` to force backup during the release window.
-        
+
+
         **Response metadata (`meta.dataSource`):**
+
         - `db` — served from database only
+
         - `vendor_backup` — vendor fetch supplemented missing rows
+
         - `partial` — incomplete DB data; backup skipped, failed, or rate-limited
-        
+
+
         **Usage Examples:**
+
         - Single day: `?date=2025-06-26&country=lt`
+
         - Date range: `?start=2025-06-01&end=2025-06-30&country=ee`
+
         - All countries: `?date=2025-06-26` (omitting country parameter returns data for all countries)
-        
+
+
         **Response Format:**
-        - One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for 15-minute MTU)
+
+        - One record per Market Time Unit (MTU) for each day (typically 24 records for 60-minute data, or 96 records for
+        15-minute MTU)
+
         - Prices in EUR/MWh
+
         - Unix timestamps (seconds) for easy processing
       tags:
         - Prices
@@ -292,36 +400,43 @@ paths:
             type: string
             format: date
             example: '2025-06-26'
-          description: 'Single date in YYYY-MM-DD format (mutually exclusive with start/end)'
+          description: Single date in YYYY-MM-DD format (mutually exclusive with start/end)
         - name: start
           in: query
           schema:
             type: string
             format: date
             example: '2025-06-01'
-          description: 'Start date for range in YYYY-MM-DD format (requires end parameter)'
+          description: Start date for range in YYYY-MM-DD format (requires end parameter)
         - name: end
           in: query
           schema:
             type: string
             format: date
             example: '2025-06-30'
-          description: 'End date for range in YYYY-MM-DD format (requires start parameter)'
+          description: End date for range in YYYY-MM-DD format (requires start parameter)
         - name: country
           in: query
           schema:
             type: string
-            enum: [lt, ee, lv, fi]
-          description: 'Country code (case insensitive). If omitted, returns data for all countries.'
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
+          description: Country code (case insensitive). If omitted, returns data for all countries.
         - name: allow_backup
           in: query
           schema:
             type: string
-            enum: ['1', 'true', 'yes']
+            enum:
+              - '1'
+              - 'true'
+              - 'yes'
           description: 'Force vendor backup fetch even during the Nordpool release window (default: skip backup in-window).'
       responses:
         '200':
-          description: 'Price data for the specified period'
+          description: Price data for the specified period
           content:
             application/json:
               schema:
@@ -336,7 +451,7 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/PriceData'
-                    description: 'Price data organized by country code'
+                    description: Price data organized by country code
                   meta:
                     type: object
                     properties:
@@ -345,32 +460,35 @@ paths:
                         example: '2025-06-26'
                       country:
                         type: string
-                        example: 'all'
+                        example: all
                       count:
                         type: integer
                         example: 96
                       timezone:
                         type: string
-                        example: 'Europe/Vilnius'
+                        example: Europe/Vilnius
                       intervalSeconds:
                         type: integer
-                        description: 'Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)'
+                        description: Market Time Unit length in seconds (e.g. 3600 for hourly, 900 for 15-minute MTU)
                         example: 900
                       dataSource:
                         type: string
-                        enum: [db, vendor_backup, partial]
-                        description: 'How the response was assembled'
+                        enum:
+                          - db
+                          - vendor_backup
+                          - partial
+                        description: How the response was assembled
                         example: db
                       releaseWindowActive:
                         type: boolean
-                        description: 'Whether the Nordpool release window was active when the request was handled'
+                        description: Whether the Nordpool release window was active when the request was handled
                         example: false
                       backupSkippedReason:
                         type: string
-                        description: 'Present when backup was skipped or failed (e.g. release_window, rate_limited, timeout)'
+                        description: Present when backup was skipped or failed (e.g. release_window, rate_limited, timeout)
                       dbRecordCount:
                         type: integer
-                        description: 'Number of records returned from the database layer'
+                        description: Number of records returned from the database layer
                         example: 24
                       total_records:
                         type: integer
@@ -386,34 +504,34 @@ paths:
                             example: '2025-06-26'
               examples:
                 single_day:
-                  summary: 'Single day prices for Lithuania'
+                  summary: Single day prices for Lithuania
                   value:
                     success: true
                     data:
                       lt:
                         - timestamp: 1750885200
-                          price: 75.0
+                          price: 75
                         - timestamp: 1750888800
                           price: 68.5
                         - timestamp: 1750892400
                           price: 72.1
                     meta:
                       date: '2025-06-26'
-                      country: 'lt'
+                      country: lt
                       count: 24
-                      timezone: 'Europe/Vilnius'
+                      timezone: Europe/Vilnius
                       intervalSeconds: 3600
                       date_range:
                         start: '2025-06-26'
                         end: '2025-06-26'
                 all_countries:
-                  summary: 'Single day prices for all countries'
+                  summary: Single day prices for all countries
                   value:
                     success: true
                     data:
                       lt:
                         - timestamp: 1750885200
-                          price: 75.0
+                          price: 75
                         - timestamp: 1750888800
                           price: 68.5
                       ee:
@@ -433,15 +551,15 @@ paths:
                           price: 65.4
                     meta:
                       date: '2025-06-26'
-                      country: 'all'
+                      country: all
                       count: 96
-                      timezone: 'Europe/Vilnius'
+                      timezone: Europe/Vilnius
                       intervalSeconds: 3600
                       date_range:
                         start: '2025-06-26'
                         end: '2025-06-26'
                 date_range:
-                  summary: 'Date range prices for Estonia'
+                  summary: Date range prices for Estonia
                   value:
                     success: true
                     data:
@@ -451,37 +569,38 @@ paths:
                         - timestamp: 1750888800
                           price: 71.3
                     meta:
-                      date: '2025-06-01 to 2025-06-30'
-                      country: 'ee'
+                      date: 2025-06-01 to 2025-06-30
+                      country: ee
                       count: 720
-                      timezone: 'Europe/Vilnius'
+                      timezone: Europe/Vilnius
                       intervalSeconds: 3600
                       date_range:
                         start: '2025-06-01'
                         end: '2025-06-30'
         '400':
-          description: 'Invalid parameters (missing required parameters or invalid date format)'
+          description: Invalid parameters (missing required parameters or invalid date format)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 success: false
-                error: 'Invalid date format. Use YYYY-MM-DD format.'
-                code: 'INVALID_DATE_FORMAT'
+                error: Invalid date format. Use YYYY-MM-DD format.
+                code: INVALID_DATE_FORMAT
         '404':
-          description: 'No price data found for the specified parameters'
+          description: No price data found for the specified parameters
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 success: false
-                error: 'No price data found for the specified date range'
-                code: 'NO_DATA_FOUND'
+                error: No price data found for the specified date range
+                code: NO_DATA_FOUND
+      operationId: getNpsPrices
   /nps/prices/upcoming:
     get:
-      summary: 'Get upcoming prices from current interval'
+      summary: Get upcoming prices from current interval
       description: |
         Retrieve upcoming electricity prices from the current market time unit (MTU) onward.
 
@@ -494,12 +613,16 @@ paths:
           in: query
           schema:
             type: string
-            enum: [lt, ee, lv, fi]
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
             default: lt
-          description: 'Country code (defaults to Lithuania if not specified)'
+          description: Country code (defaults to Lithuania if not specified)
       responses:
         '200':
-          description: 'Upcoming price data from current MTU to end of tomorrow'
+          description: Upcoming price data from current MTU to end of tomorrow
           content:
             application/json:
               schema:
@@ -519,13 +642,13 @@ paths:
                     properties:
                       country:
                         type: string
-                        example: 'lt'
+                        example: lt
                       count:
                         type: integer
                         example: 48
                       timezone:
                         type: string
-                        example: 'Europe/Vilnius'
+                        example: Europe/Vilnius
                       intervalSeconds:
                         type: integer
                         example: 900
@@ -546,31 +669,32 @@ paths:
                 data:
                   lt:
                     - timestamp: 1750932000
-                      price: 75.0
+                      price: 75
                     - timestamp: 1750932900
                       price: 68.5
                 meta:
-                  country: 'lt'
+                  country: lt
                   count: 2
-                  timezone: 'Europe/Vilnius'
+                  timezone: Europe/Vilnius
                   intervalSeconds: 900
                   current_time_local: '2025-06-26 12:07:00'
                   date_range:
                     start: '2025-06-26'
                     end: '2025-06-27'
         '404':
-          description: 'No upcoming price data available'
+          description: No upcoming price data available
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 success: false
-                error: 'No upcoming price data available'
-                code: 'NO_DATA_FOUND'
+                error: No upcoming price data available
+                code: NO_DATA_FOUND
+      operationId: getNpsPricesUpcoming
   /latest:
     get:
-      summary: 'Get latest price (legacy endpoint)'
+      summary: Get latest price (legacy endpoint)
       description: |
         **Deprecated.** Legacy compatibility endpoint. Prefer `GET /nps/price/{country}/latest`.
       deprecated: true
@@ -581,11 +705,15 @@ paths:
           in: query
           schema:
             type: string
-            enum: [lt, ee, lv, fi]
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
           description: 'Country code (default: lt)'
       responses:
         '200':
-          description: 'Latest price data'
+          description: Latest price data
           content:
             application/json:
               schema:
@@ -618,22 +746,23 @@ paths:
                 success: true
                 data:
                   - timestamp: 1750885200
-                    price: 75.0
-                    country: 'lt'
+                    price: 75
+                    country: LT
                 meta:
-                  country: 'lt'
+                  country: lt
                   count: 1
-                  timezone: 'Europe/Vilnius'
+                  timezone: Europe/Vilnius
                   last_updated: '2025-06-26T00:15:30.024Z'
         '404':
-          description: 'No price data found'
+          description: No price data found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      operationId: getLatest
   /prices:
     get:
-      summary: 'Get price data (legacy redirect)'
+      summary: Get price data (legacy redirect)
       description: |
         **Deprecated.** Redirects to `/nps/prices` with the same query parameters.
         Use `GET /nps/prices` instead.
@@ -660,33 +789,39 @@ paths:
           in: query
           schema:
             type: string
-            enum: [lt, ee, lv, fi]
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
       responses:
         '302':
-          description: 'Redirect to /nps/prices with preserved query string'
+          description: Redirect to /nps/prices with preserved query string
+      operationId: getPrices
   /settings:
     get:
-      summary: 'Get application settings'
-      description: 'Returns key-value settings stored in the database.'
+      summary: Get application settings
+      description: Returns key-value settings stored in the database.
       tags:
         - Configuration
       responses:
         '200':
-          description: 'Settings object'
+          description: Settings object
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: true
         '500':
-          description: 'Failed to fetch settings'
+          description: Failed to fetch settings
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      operationId: getSettings
   /settings/{key}:
     put:
-      summary: 'Update a setting'
+      summary: Update a setting
       tags:
         - Configuration
       parameters:
@@ -701,13 +836,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [value]
+              required:
+                - value
               properties:
                 value:
-                  description: 'New value for the setting'
+                  description: New value for the setting
       responses:
         '200':
-          description: 'Setting updated'
+          description: Setting updated
           content:
             application/json:
               schema:
@@ -717,27 +853,30 @@ paths:
                     type: boolean
                     example: true
         '400':
-          description: 'Missing value'
+          description: Missing value
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '500':
-          description: 'Failed to update setting'
+          description: Failed to update setting
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+      operationId: putSettingsKey
+      description: Update a setting
   /sync/status:
     get:
-      summary: 'Get sync worker status'
-      description: |
-        Returns the current sync worker state including whether a sync is running, scheduled jobs, and in-progress sync metadata. Used by the frontend PWA and ops tooling for smart sync decisions.
+      summary: Get sync worker status
+      description: >
+        Returns the current sync worker state including whether a sync is running, scheduled jobs, and in-progress sync
+        metadata. Used by the frontend PWA and ops tooling for smart sync decisions.
       tags:
         - Sync
       responses:
         '200':
-          description: 'Sync worker status'
+          description: Sync worker status
           content:
             application/json:
               schema:
@@ -762,32 +901,27 @@ paths:
                         type: array
                         items:
                           type: object
+                          additionalProperties: true
                       currentSync:
                         type: object
                         nullable: true
+                        additionalProperties: true
                       syncInProgress:
                         type: boolean
-              example:
-                success: true
-                data:
-                  isRunning: false
-                  startTime: null
-                  lastHealthCheck: '2026-06-15T10:30:00.000Z'
-                  scheduledJobs: []
-                  currentSync: null
-                  syncInProgress: false
         '500':
-          description: 'Failed to get sync status'
+          description: Failed to get sync status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+      operationId: getSyncStatus
   /sync/trigger:
     post:
-      summary: 'Trigger manual or catch-up sync'
-      description: |
-        Triggers a sync operation. When `country` is provided in the request body, runs a manual sync for that country over `daysBack` days (default 1). When `country` is omitted, runs a catch-up sync from the last successful sync state.
+      summary: Trigger manual or catch-up sync
+      description: >
+        Triggers a sync operation. When `country` is provided in the request body, runs a manual sync for that country
+        over `daysBack` days (default 1). When `country` is omitted, runs a catch-up sync from the last successful sync
+        state.
       tags:
         - Sync
       requestBody:
@@ -799,25 +933,29 @@ paths:
               properties:
                 country:
                   type: string
-                  enum: [lt, ee, lv, fi]
-                  description: 'Country code for manual sync. Omit for catch-up sync.'
+                  enum:
+                    - lt
+                    - ee
+                    - lv
+                    - fi
+                  description: Country code for manual sync. Omit for catch-up sync.
                 daysBack:
                   type: integer
                   minimum: 1
                   default: 1
-                  description: 'Number of days to sync when country is specified.'
+                  description: Number of days to sync when country is specified.
             examples:
               catchUp:
-                summary: 'Catch-up sync (all countries from last OK state)'
+                summary: Catch-up sync (all countries from last OK state)
                 value: {}
               manualCountry:
-                summary: 'Manual sync for one country'
+                summary: Manual sync for one country
                 value:
                   country: lt
                   daysBack: 2
       responses:
         '200':
-          description: 'Sync completed successfully'
+          description: Sync completed successfully
           content:
             application/json:
               schema:
@@ -829,41 +967,41 @@ paths:
                     type: string
                   records:
                     type: integer
-                    description: 'Present for manual country sync'
+                    description: Present for manual country sync
                   country:
                     type: string
-                    description: 'Present for manual country sync'
+                    description: Present for manual country sync
                   daysBack:
                     type: integer
-                    description: 'Present for manual country sync'
+                    description: Present for manual country sync
               examples:
                 catchUp:
                   value:
                     success: true
-                    message: 'Catch-up sync completed'
+                    message: Catch-up sync completed
                 manual:
                   value:
                     success: true
-                    message: 'Manual sync completed for LT'
+                    message: Manual sync completed for LT
                     records: 96
                     country: lt
                     daysBack: 1
         '409':
-          description: 'Another sync is already running'
+          description: Another sync is already running
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '500':
-          description: 'Manual sync failed'
+          description: Manual sync failed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+      operationId: postSyncTrigger
   /sync/historical:
     post:
-      summary: 'Sync historical data for a date range'
+      summary: Sync historical data for a date range
       tags:
         - Sync
       requestBody:
@@ -872,7 +1010,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [startDate, endDate]
+              required:
+                - startDate
+                - endDate
               properties:
                 startDate:
                   type: string
@@ -882,19 +1022,24 @@ paths:
                   format: date
                 country:
                   type: string
-                  enum: [lt, ee, lv, fi]
+                  enum:
+                    - lt
+                    - ee
+                    - lv
+                    - fi
                   default: lt
       responses:
         '200':
-          description: 'Historical sync completed'
+          description: Historical sync completed
         '400':
-          description: 'Missing required parameters'
+          description: Missing required parameters
         '500':
-          description: 'Historical sync failed'
-
+          description: Historical sync failed
+      operationId: postSyncHistorical
+      description: Sync historical data for a date range
   /sync/year:
     post:
-      summary: 'Sync all data for a specific year'
+      summary: Sync all data for a specific year
       tags:
         - Sync
       requestBody:
@@ -903,25 +1048,31 @@ paths:
           application/json:
             schema:
               type: object
-              required: [year]
+              required:
+                - year
               properties:
                 year:
                   type: integer
                 country:
                   type: string
-                  enum: [lt, ee, lv, fi]
+                  enum:
+                    - lt
+                    - ee
+                    - lv
+                    - fi
                   default: lt
       responses:
         '200':
-          description: 'Year sync completed'
+          description: Year sync completed
         '400':
-          description: 'Missing year'
+          description: Missing year
         '500':
-          description: 'Year sync failed'
-
+          description: Year sync failed
+      operationId: postSyncYear
+      description: Sync all data for a specific year
   /sync/years:
     post:
-      summary: 'Sync data for a range of years'
+      summary: Sync data for a range of years
       tags:
         - Sync
       requestBody:
@@ -930,7 +1081,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [startYear, endYear]
+              required:
+                - startYear
+                - endYear
               properties:
                 startYear:
                   type: integer
@@ -938,20 +1091,25 @@ paths:
                   type: integer
                 country:
                   type: string
-                  enum: [lt, ee, lv, fi]
+                  enum:
+                    - lt
+                    - ee
+                    - lv
+                    - fi
                   default: lt
       responses:
         '200':
-          description: 'Year range sync completed'
+          description: Year range sync completed
         '400':
-          description: 'Missing year range'
+          description: Missing year range
         '500':
-          description: 'Year range sync failed'
-
+          description: Year range sync failed
+      operationId: postSyncYears
+      description: Sync data for a range of years
   /sync/all-historical:
     post:
-      summary: 'Sync all historical data for one country'
-      description: 'Syncs from 2012-07-01 through today for the given country.'
+      summary: Sync all historical data for one country
+      description: Syncs from 2012-07-01 through today for the given country.
       tags:
         - Sync
       requestBody:
@@ -962,29 +1120,33 @@ paths:
               properties:
                 country:
                   type: string
-                  enum: [lt, ee, lv, fi]
+                  enum:
+                    - lt
+                    - ee
+                    - lv
+                    - fi
                   default: lt
       responses:
         '200':
-          description: 'All historical sync completed'
+          description: All historical sync completed
         '500':
-          description: 'All historical sync failed'
-
+          description: All historical sync failed
+      operationId: postSyncAll-historical
   /sync/efficient:
     post:
-      summary: 'Efficient sync for all countries'
-      description: 'Runs an optimized multi-country sync using batched Elering API calls.'
+      summary: Efficient sync for all countries
+      description: Runs an optimized multi-country sync using batched Elering API calls.
       tags:
         - Sync
       responses:
         '200':
-          description: 'Efficient sync completed'
+          description: Efficient sync completed
         '500':
-          description: 'Efficient sync failed'
-
+          description: Efficient sync failed
+      operationId: postSyncEfficient
   /sync/all-countries-historical:
     post:
-      summary: 'Historical sync for all countries in parallel'
+      summary: Historical sync for all countries in parallel
       tags:
         - Sync
       requestBody:
@@ -993,7 +1155,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [startDate, endDate]
+              required:
+                - startDate
+                - endDate
               properties:
                 startDate:
                   type: string
@@ -1003,34 +1167,36 @@ paths:
                   format: date
       responses:
         '200':
-          description: 'All countries historical sync completed'
+          description: All countries historical sync completed
         '400':
-          description: 'Missing date range'
+          description: Missing date range
         '500':
-          description: 'Sync failed'
-
+          description: Sync failed
+      operationId: postSyncAll-countries-historical
+      description: Historical sync for all countries in parallel
   /sync/all-countries-all-historical:
     post:
-      summary: 'Full historical sync for all countries'
-      description: 'Syncs 2012-07-01 through today for LT, EE, LV, and FI in parallel.'
+      summary: Full historical sync for all countries
+      description: Syncs 2012-07-01 through today for LT, EE, LV, and FI in parallel.
       tags:
         - Sync
       responses:
         '200':
-          description: 'Full historical sync completed'
+          description: Full historical sync completed
         '500':
-          description: 'Sync failed'
-
+          description: Sync failed
+      operationId: postSyncAll-countries-all-historical
   /sync/reset-initial:
     post:
-      summary: 'Reset initial sync status'
-      description: |
-        Clears the initial sync completion and last chunk markers in the database. Use this endpoint to force the backend to re-run the initial sync on next startup. Intended for testing and maintenance.
+      summary: Reset initial sync status
+      description: >
+        Clears the initial sync completion and last chunk markers in the database. Use this endpoint to force the
+        backend to re-run the initial sync on next startup. Intended for testing and maintenance.
       tags:
         - Sync
       responses:
         '200':
-          description: 'Initial sync status reset successfully'
+          description: Initial sync status reset successfully
           content:
             application/json:
               schema:
@@ -1042,30 +1208,30 @@ paths:
                     type: string
               example:
                 success: true
-                message: 'Initial sync status reset successfully. Restart the backend to trigger initial sync.'
+                message: Initial sync status reset successfully. Restart the backend to trigger initial sync.
         '500':
-          description: 'Failed to reset initial sync status'
+          description: Failed to reset initial sync status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+      operationId: postSyncReset-initial
   /configurations:
     get:
-      summary: 'Get price configurations and system charges'
+      summary: Get price configurations and system charges
       description: |
         Retrieve electricity tariff configurations and system charges for price calculations.
-        
+
         **Features:**
         - Multi-country support (LT, EE, LV, FI)
         - Historical tariff data grouped by effective date
         - System charges (VIAP, distributionplus, etc.)
         - Optimized for frontend caching
-        
+
         **Usage Examples:**
         - Single country: `?country=lt`
         - All countries: (omit country parameter)
-        
+
         **Response Format:**
         - Tariffs grouped by country, then by effective date, then by zone and plan
         - System charges grouped by country, then by effective date
@@ -1077,11 +1243,15 @@ paths:
           in: query
           schema:
             type: string
-            enum: [lt, ee, lv, fi]
-          description: 'Country code (case insensitive). If omitted, returns data for all countries.'
+            enum:
+              - lt
+              - ee
+              - lv
+              - fi
+          description: Country code (case insensitive). If omitted, returns data for all countries.
       responses:
         '200':
-          description: 'Price configurations and system charges'
+          description: Price configurations and system charges
           content:
             application/json:
               schema:
@@ -1095,66 +1265,66 @@ paths:
                     properties:
                       tariffs:
                         type: object
-                        description: 'Tariffs grouped by country, then effective date, then zone and plan'
+                        description: Tariffs grouped by country, then effective date, then zone and plan
                         additionalProperties:
                           type: object
-                          description: 'Country code (lt, ee, lv, fi)'
+                          description: Country code (lt, ee, lv, fi)
                           additionalProperties:
                             type: object
-                            description: 'Effective date (YYYY-MM-DD)'
+                            description: Effective date (YYYY-MM-DD)
                             additionalProperties:
                               type: object
-                              description: 'Zone name (Four zones, Two zones, Single zone)'
+                              description: Zone name (Four zones, Two zones, Single zone)
                               additionalProperties:
                                 type: object
-                                description: 'Plan name (Standart, Smart, Effective, Home, etc.)'
+                                description: Plan name (Standart, Smart, Effective, Home, etc.)
                                 additionalProperties:
                                   type: number
-                                  description: 'Price for time period (morning, day, evening, night)'
+                                  description: Price for time period (morning, day, evening, night)
                       systemCharges:
                         type: object
-                        description: 'System charges grouped by country, then effective date'
+                        description: System charges grouped by country, then effective date
                         additionalProperties:
                           type: object
-                          description: 'Country code (lt, ee, lv, fi)'
+                          description: Country code (lt, ee, lv, fi)
                           additionalProperties:
                             type: object
-                            description: 'Effective date (YYYY-MM-DD)'
+                            description: Effective date (YYYY-MM-DD)
                             additionalProperties:
                               type: number
-                              description: 'Charge amount (VIAP, distributionplus, etc.)'
+                              description: Charge amount (VIAP, distributionplus, etc.)
                   meta:
                     type: object
                     properties:
                       country:
                         type: string
-                        description: 'Requested country or "all"'
-                        example: 'lt'
+                        description: Requested country or "all"
+                        example: lt
                       count:
                         type: integer
-                        description: 'Number of countries in response'
+                        description: Number of countries in response
                         example: 1
               examples:
                 single_country:
-                  summary: 'Price configurations for Lithuania'
+                  summary: Price configurations for Lithuania
                   value:
                     success: true
                     data:
                       tariffs:
                         lt:
                           '2023-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.06534
                                 day: 0.07986
                                 evening: 0.10648
                                 night: 0.05203
-                            'Two zones':
+                            Two zones:
                               Standart:
-                                day: 0.09680
+                                day: 0.0968
                                 night: 0.05687
                           '2024-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.07502
                                 day: 0.09438
@@ -1163,23 +1333,23 @@ paths:
                       systemCharges:
                         lt:
                           '2024-01-01':
-                            VIAP: 0.00
+                            VIAP: 0
                             distributionplus: 0.00045
                           '2025-01-01':
                             VIAP: -0.00039
                             distributionplus: 0.000893
                     meta:
-                      country: 'lt'
+                      country: lt
                       count: 1
                 all_countries:
-                  summary: 'Price configurations for all countries'
+                  summary: Price configurations for all countries
                   value:
                     success: true
                     data:
                       tariffs:
                         lt:
                           '2023-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.06534
                                 day: 0.07986
@@ -1187,7 +1357,7 @@ paths:
                                 night: 0.05203
                         ee:
                           '2023-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.06534
                                 day: 0.07986
@@ -1195,7 +1365,7 @@ paths:
                                 night: 0.05203
                         lv:
                           '2023-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.06534
                                 day: 0.07986
@@ -1203,7 +1373,7 @@ paths:
                                 night: 0.05203
                         fi:
                           '2023-01-01':
-                            'Four zones':
+                            Four zones:
                               Smart:
                                 morning: 0.06534
                                 day: 0.07986
@@ -1212,40 +1382,42 @@ paths:
                       systemCharges:
                         lt:
                           '2024-01-01':
-                            VIAP: 0.00
+                            VIAP: 0
                             distributionplus: 0.00045
                         ee:
                           '2024-01-01':
-                            VIAP: 0.00
+                            VIAP: 0
                             distributionplus: 0.00045
                         lv:
                           '2024-01-01':
-                            VIAP: 0.00
+                            VIAP: 0
                             distributionplus: 0.00045
                         fi:
                           '2024-01-01':
-                            VIAP: 0.00
+                            VIAP: 0
                             distributionplus: 0.00045
                     meta:
-                      country: 'all'
+                      country: all
                       count: 4
         '500':
-          description: 'Failed to fetch configurations'
+          description: Failed to fetch configurations
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+      operationId: getConfigurations
   /sync/initial-status:
     get:
-      summary: 'Get initial sync status'
-      description: |
-        Returns the current status of the initial sync process, including whether it is complete, the last completed date, record count, and any errors. The initial sync is performed in chunks, and only marked complete when the final chunk (up to today) is finished.
+      summary: Get initial sync status
+      description: >
+        Returns the current status of the initial sync process, including whether it is complete, the last completed
+        date, record count, and any errors. The initial sync is performed in chunks, and only marked complete when the
+        final chunk (up to today) is finished.
       tags:
         - Sync
       responses:
         '200':
-          description: 'Initial sync status'
+          description: Initial sync status
           content:
             application/json:
               schema:
@@ -1269,24 +1441,16 @@ paths:
                       lastError:
                         type: string
                         nullable: true
-              example:
-                success: true
-                data:
-                  isComplete: true
-                  completedDate: '2025-06-29'
-                  recordsCount: 123456
-                  completedAt: '2025-06-26T21:20:21.088Z'
-                  lastError: null
         '500':
-          description: 'Failed to get initial sync status'
+          description: Failed to get initial sync status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+      operationId: getSyncInitial-status
   /sync/date-complete/{date}:
     get:
-      summary: 'Check data completeness for a date'
+      summary: Check data completeness for a date
       tags:
         - Sync
       parameters:
@@ -1298,7 +1462,7 @@ paths:
             format: date
       responses:
         '200':
-          description: 'Date completeness status'
+          description: Date completeness status
           content:
             application/json:
               schema:
@@ -1309,18 +1473,19 @@ paths:
                   data:
                     type: object
         '400':
-          description: 'Invalid date format'
+          description: Invalid date format
         '500':
-          description: 'Failed to check completeness'
-
+          description: Failed to check completeness
+      operationId: getSyncDate-completeDate
+      description: Check data completeness for a date
   /sync/recent-completeness:
     get:
-      summary: 'Check today and yesterday completeness'
+      summary: Check today and yesterday completeness
       tags:
         - Sync
       responses:
         '200':
-          description: 'Recent completeness for today and yesterday'
+          description: Recent completeness for today and yesterday
           content:
             application/json:
               schema:
@@ -1338,27 +1503,28 @@ paths:
                       needsSync:
                         type: boolean
         '500':
-          description: 'Failed to check recent completeness'
-
+          description: Failed to check recent completeness
+      operationId: getSyncRecent-completeness
+      description: Check today and yesterday completeness
   /admin/cron:
     get:
-      summary: 'List cron schedules (admin)'
-      description: 'Returns persisted cron schedules merged with runtime sync worker status. Requires ADMIN_API_TOKEN.'
+      summary: List cron schedules (admin)
+      description: Returns persisted cron schedules merged with runtime sync worker status. Requires ADMIN_API_TOKEN.
       tags:
         - Admin
       security:
         - AdminToken: []
       responses:
         '200':
-          description: 'Cron schedule list'
+          description: Cron schedule list
         '401':
-          description: 'Unauthorized'
+          description: Unauthorized
         '503':
-          description: 'Admin API not configured'
-
+          description: Admin API not configured
+      operationId: getAdminCron
   /admin/cron/audit:
     get:
-      summary: 'Cron schedule change audit log (admin)'
+      summary: Cron schedule change audit log (admin)
       tags:
         - Admin
       security:
@@ -1375,11 +1541,12 @@ paths:
             default: 20
       responses:
         '200':
-          description: 'Audit log entries'
-
+          description: Audit log entries
+      operationId: getAdminCronAudit
+      description: Cron schedule change audit log (admin)
   /admin/cron/{jobKey}:
     put:
-      summary: 'Update cron schedule (admin)'
+      summary: Update cron schedule (admin)
       tags:
         - Admin
       security:
@@ -1405,35 +1572,38 @@ paths:
                   type: boolean
       responses:
         '200':
-          description: 'Schedule updated and scheduler reloaded'
+          description: Schedule updated and scheduler reloaded
         '400':
-          description: 'Validation error or read-only job'
+          description: Validation error or read-only job
         '404':
-          description: 'Unknown job key'
-
+          description: Unknown job key
+      operationId: putAdminCronJobKey
+      description: Update cron schedule (admin)
   /push/vapid-public:
     get:
-      summary: 'Get VAPID public key for push subscription'
+      summary: Get VAPID public key for push subscription
       tags:
         - Push
       responses:
         '200':
-          description: 'Public key for client pushManager.subscribe'
+          description: Public key for client pushManager.subscribe
         '503':
-          description: 'Push not configured'
-
+          description: Push not configured
+      operationId: getPushVapid-public
+      description: Get VAPID public key for push subscription
   /push/status:
     get:
-      summary: 'Whether push is configured on the server'
+      summary: Whether push is configured on the server
       tags:
         - Push
       responses:
         '200':
-          description: 'Configuration status'
-
+          description: Configuration status
+      operationId: getPushStatus
+      description: Whether push is configured on the server
   /push/subscribe:
     post:
-      summary: 'Register web push subscription'
+      summary: Register web push subscription
       tags:
         - Push
       requestBody:
@@ -1444,34 +1614,38 @@ paths:
               type: object
       responses:
         '201':
-          description: 'Subscription stored'
+          description: Subscription stored
         '400':
-          description: 'Invalid subscription payload'
+          description: Invalid subscription payload
         '503':
-          description: 'Push not configured'
+          description: Push not configured
+      operationId: postPushSubscribe
+      description: Register web push subscription
     delete:
-      summary: 'Deactivate web push subscription'
+      summary: Deactivate web push subscription
       tags:
         - Push
       responses:
         '200':
-          description: 'Subscription deactivated'
-
+          description: Subscription deactivated
+      operationId: deletePushSubscribe
+      description: Deactivate web push subscription
   /push/test:
     post:
-      summary: 'Send test push to own subscription'
+      summary: Send test push to own subscription
       tags:
         - Push
       responses:
         '200':
-          description: 'Notification sent'
+          description: Notification sent
         '404':
-          description: 'Subscription not found'
-
+          description: Subscription not found
+      operationId: postPushTest
+      description: Send test push to own subscription
   /admin/push/stats:
     get:
-      summary: 'Push subscription and delivery stats (admin)'
-      description: 'Active/total subscriptions and 24h send/failure counts. See docs/ops/push-admin.md.'
+      summary: Push subscription and delivery stats (admin)
+      description: Active/total subscriptions and 24h send/failure counts. See docs/ops/push-admin.md.
       tags:
         - Admin
         - Push
@@ -1479,20 +1653,20 @@ paths:
         - AdminToken: []
       responses:
         '200':
-          description: 'Stats payload'
+          description: Stats payload
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushStatsResponse'
         '401':
-          description: 'Invalid or missing admin token'
+          description: Invalid or missing admin token
         '503':
-          description: 'ADMIN_API_TOKEN not configured'
-
+          description: ADMIN_API_TOKEN not configured
+      operationId: getAdminPushStats
   /admin/push/deliveries:
     get:
-      summary: 'Recent push deliveries and failures (admin)'
-      description: 'Newest-first delivery log. Query limit 1–200 (default 50).'
+      summary: Recent push deliveries and failures (admin)
+      description: Newest-first delivery log. Query limit 1–200 (default 50).
       tags:
         - Admin
         - Push
@@ -1508,17 +1682,17 @@ paths:
             default: 50
       responses:
         '200':
-          description: 'Delivery log'
+          description: Delivery log
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushDeliveriesResponse'
         '401':
-          description: 'Invalid or missing admin token'
-
+          description: Invalid or missing admin token
+      operationId: getAdminPushDeliveries
   /admin/push/test:
     post:
-      summary: 'Send test push to subscription by id (admin)'
+      summary: Send test push to subscription by id (admin)
       tags:
         - Admin
         - Push
@@ -1532,19 +1706,20 @@ paths:
               $ref: '#/components/schemas/PushTestRequest'
       responses:
         '200':
-          description: 'Notification sent'
+          description: Notification sent
         '400':
-          description: 'Missing subscriptionId'
+          description: Missing subscriptionId
         '404':
-          description: 'Subscription not found'
+          description: Subscription not found
         '502':
-          description: 'Delivery failed'
+          description: Delivery failed
         '503':
-          description: 'VAPID not configured'
-
+          description: VAPID not configured
+      operationId: postAdminPushTest
+      description: Send test push to subscription by id (admin)
   /admin/push/broadcast:
     post:
-      summary: 'Broadcast push to active subscriptions (admin)'
+      summary: Broadcast push to active subscriptions (admin)
       tags:
         - Admin
         - Push
@@ -1558,114 +1733,135 @@ paths:
               $ref: '#/components/schemas/PushBroadcastRequest'
       responses:
         '200':
-          description: 'Broadcast summary'
+          description: Broadcast summary
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PushBroadcastResponse'
         '400':
-          description: 'Missing title or body'
+          description: Missing title or body
         '503':
-          description: 'VAPID not configured'
-
+          description: VAPID not configured
+      operationId: postAdminPushBroadcast
+      description: Broadcast push to active subscriptions (admin)
 components:
   schemas:
     Country:
       type: object
-      description: 'Country information for electricity price data'
+      description: Country information for electricity price data
       properties:
         code:
           type: string
-          description: 'ISO 3166-1 alpha-2 country code'
-          example: 'lt'
-          enum: ['lt', 'ee', 'lv', 'fi']
+          description: ISO 3166-1 alpha-2 country code
+          example: lt
+          enum:
+            - lt
+            - ee
+            - lv
+            - fi
         name:
           type: string
-          description: 'Full country name'
-          example: 'Lithuania'
-          enum: ['Lithuania', 'Estonia', 'Latvia', 'Finland']
+          description: Full country name
+          example: Lithuania
+          enum:
+            - Lithuania
+            - Estonia
+            - Latvia
+            - Finland
       required:
         - code
         - name
       example:
-        code: 'lt'
-        name: 'Lithuania'
+        code: lt
+        name: Lithuania
     PriceData:
       type: object
-      description: 'Individual electricity price data point'
+      description: Individual electricity price data point
       properties:
         timestamp:
           type: integer
-          description: 'Unix timestamp in seconds (UTC)'
+          description: Unix timestamp in seconds (UTC)
           example: 1750885200
           minimum: 0
         price:
           type: number
-          description: 'Electricity price in EUR/MWh'
-          example: 75.0
+          description: Electricity price in EUR/MWh
+          example: 75
           minimum: 0
           format: float
         country:
           type: string
-          description: 'Country code (included in some responses)'
-          example: 'LT'
-          enum: ['LT', 'EE', 'LV', 'FI']
+          description: Country code (included in some responses)
+          example: LT
+          enum:
+            - LT
+            - EE
+            - LV
+            - FI
       required:
         - timestamp
         - price
       example:
         timestamp: 1750885200
-        price: 75.0
-        country: 'LT'
+        price: 75
+        country: LT
     PriceMeta:
       type: object
-      description: 'Metadata for price data responses'
+      description: Metadata for price data responses
       properties:
         countries:
           type: array
           items:
             type: string
-            enum: ['LT', 'EE', 'LV', 'FI']
-          description: 'List of countries in the response'
-          example: ['LT']
+            enum:
+              - LT
+              - EE
+              - LV
+              - FI
+          description: List of countries in the response
+          example:
+            - LT
         date:
           type: string
           format: date
-          description: 'Date in YYYY-MM-DD format'
+          description: Date in YYYY-MM-DD format
           example: '2025-06-26'
         hour:
           type: string
-          description: 'Hour in HH:MM format'
+          description: Hour in HH:MM format
           example: '00:00'
-          pattern: '^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$'
+          pattern: ^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$
         timezone:
           type: string
-          description: 'Timezone used for timestamps'
-          example: 'Europe/Vilnius'
-          default: 'Europe/Vilnius'
+          description: Timezone used for timestamps
+          example: Europe/Vilnius
+          default: Europe/Vilnius
         timestamp_local:
           type: integer
-          description: 'Local timestamp in seconds'
+          description: Local timestamp in seconds
           example: 1750885200
           minimum: 0
         price_unit:
           type: string
-          description: 'Price unit'
-          example: 'EUR/MWh'
-          default: 'EUR/MWh'
+          description: Price unit
+          example: EUR/MWh
+          default: EUR/MWh
         data_type:
           type: string
-          description: 'Type of price data'
-          example: 'latest_published'
-          enum: ['latest_published', 'current_hour', 'historical']
+          description: Type of price data
+          example: latest_published
+          enum:
+            - latest_published
+            - current_hour
+            - historical
         current_time_local:
           type: string
           format: date-time
-          description: 'Current local time (for current hour endpoints)'
+          description: Current local time (for current hour endpoints)
           example: '2025-06-26T00:15:30.024Z'
         is_current_hour:
           type: boolean
-          description: 'Whether the data represents the current hour'
+          description: Whether the data represents the current hour
           example: true
       required:
         - countries
@@ -1676,52 +1872,58 @@ components:
         - price_unit
         - data_type
       example:
-        countries: ['LT']
+        countries:
+          - LT
         date: '2025-06-26'
         hour: '00:00'
-        timezone: 'Europe/Vilnius'
+        timezone: Europe/Vilnius
         timestamp_local: 1750885200
-        price_unit: 'EUR/MWh'
-        data_type: 'latest_published'
+        price_unit: EUR/MWh
+        data_type: latest_published
         current_time_local: '2025-06-26T00:15:30.024Z'
         is_current_hour: true
     Error:
       type: object
-      description: 'Standard error response format'
+      description: Standard error response format
       properties:
         success:
           type: boolean
-          description: 'Always false for error responses'
+          description: Always false for error responses
           example: false
           default: false
         error:
           type: string
-          description: 'Human-readable error message'
-          example: 'No price data found for the specified country'
+          description: Human-readable error message
+          example: No price data found for the specified country
         code:
           type: string
-          description: 'Machine-readable error code'
-          example: 'NO_DATA_FOUND'
-          enum: ['NO_DATA_FOUND', 'INVALID_DATE_FORMAT', 'INVALID_COUNTRY', 'INVALID_PARAMETERS', 'INTERNAL_ERROR']
+          description: Machine-readable error code
+          example: NO_DATA_FOUND
+          enum:
+            - NO_DATA_FOUND
+            - INVALID_DATE_FORMAT
+            - INVALID_COUNTRY
+            - INVALID_PARAMETERS
+            - INTERNAL_ERROR
         timestamp:
           type: string
           format: date-time
-          description: 'Error timestamp'
+          description: Error timestamp
           example: '2025-06-26T00:15:30.024Z'
         path:
           type: string
-          description: 'Request path that caused the error'
-          example: '/api/v1/nps/price/lt/latest'
+          description: Request path that caused the error
+          example: /api/v1/nps/price/lt/latest
       required:
         - success
         - error
         - code
       example:
         success: false
-        error: 'No price data found for the specified country'
-        code: 'NO_DATA_FOUND'
+        error: No price data found for the specified country
+        code: NO_DATA_FOUND
         timestamp: '2025-06-26T00:15:30.024Z'
-        path: '/api/v1/nps/price/lt/latest'
+        path: /api/v1/nps/price/lt/latest
     PushStatsResponse:
       type: object
       properties:
@@ -1751,7 +1953,7 @@ components:
                   example: 1
             configured:
               type: boolean
-              description: 'Whether VAPID keys are set'
+              description: Whether VAPID keys are set
     PushDeliveriesResponse:
       type: object
       properties:
@@ -1764,10 +1966,12 @@ components:
               type: array
               items:
                 type: object
+                additionalProperties: true
             failures:
               type: array
               items:
                 type: object
+                additionalProperties: true
     PushTestRequest:
       type: object
       required:
@@ -1815,20 +2019,23 @@ components:
       type: apiKey
       in: header
       name: X-Admin-Token
+externalDocs:
+  description: Project Documentation
+  url: https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/README.md
 tags:
   - name: Prices
-    description: 'Electricity price data endpoints'
+    description: Electricity price data endpoints
   - name: Health
-    description: 'System health and status endpoints'
+    description: System health and status endpoints
   - name: Countries
-    description: 'Country information endpoints' 
+    description: Country information endpoints
   - name: Configuration
-    description: 'Price configuration and tariff endpoints'
+    description: Price configuration and tariff endpoints
   - name: Sync
-    description: 'Sync worker status and admin triggers'
+    description: Sync worker status and admin triggers
   - name: Admin
-    description: 'Protected admin API (ADMIN_API_TOKEN)'
+    description: Protected admin API (ADMIN_API_TOKEN)
   - name: Push
-    description: 'Web push subscriptions and admin delivery (see docs/ops/push-admin.md)'
+    description: Web push subscriptions and admin delivery (see docs/ops/push-admin.md)
   - name: Legacy
-    description: 'Deprecated compatibility endpoints; prefer /nps/* equivalents'
+    description: Deprecated compatibility endpoints; prefer /nps/* equivalents
