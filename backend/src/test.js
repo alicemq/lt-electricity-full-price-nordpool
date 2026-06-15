@@ -11,6 +11,7 @@ import {
 } from './lib/sync/releaseWindow.js';
 import { getExpectedMtuRange } from './lib/sync/completeness.js';
 import { shouldSuppressDailySyncForToday } from './lib/sync/suppression.js';
+import { validateCronSchedule } from './lib/admin/cronValidation.js';
 
 let passed = 0;
 let failed = 0;
@@ -125,6 +126,21 @@ await testAsync('suppresses only when today and tomorrow are complete', async ()
   assert.equal(suppressed, true);
   assert.ok(worker.dailySyncSuppressedDate);
   clearTimeout(worker.dailySyncTimeout);
+});
+
+test('validateCronSchedule accepts known weekly sync expression', () => {
+  const result = validateCronSchedule('0 2 * * 0', 'Europe/Vilnius');
+  assert.equal(result.valid, true);
+});
+
+test('validateCronSchedule rejects invalid cron expression', () => {
+  const result = validateCronSchedule('not-a-cron', 'Europe/Vilnius');
+  assert.equal(result.valid, false);
+});
+
+test('validateCronSchedule rejects invalid timezone', () => {
+  const result = validateCronSchedule('0 2 * * 0', 'Not/AZone');
+  assert.equal(result.valid, false);
 });
 
 console.log(`\nTest results: ${passed} passed, ${failed} failed`);
