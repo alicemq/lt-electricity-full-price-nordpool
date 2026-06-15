@@ -16,14 +16,14 @@ jobs:
   lint-and-unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate Docker Compose
         run: |
           docker compose config -q
           docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -73,11 +73,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ (vars.CI_GITLEAKS_ENABLED || '1') != '0' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
