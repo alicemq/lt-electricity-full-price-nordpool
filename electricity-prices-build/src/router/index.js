@@ -115,6 +115,21 @@ const router = createRouter({
       }
     },
     {
+      path: '/editor',
+      name: 'editor',
+      component: () => import('../views/EditorView.vue'),
+      meta: {
+        title: {
+          lt: 'Išdėstymo redaktorius',
+          en: 'Layout Editor'
+        },
+        description: {
+          lt: 'Kurkite ir išsaugokite TV ar kiosk rodinių išdėstymus.',
+          en: 'Build and save TV or kiosk display layouts.'
+        }
+      }
+    },
+    {
       path: '/display',
       name: 'display',
       component: () => import('../views/DisplayView.vue'),
