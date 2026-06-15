@@ -20,6 +20,7 @@ import {
 } from './lib/admin/cronSchedules.js';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getLatestTimestamp, logSync, getAllEarliestTimestamps, getInitialSyncStatus, getDatabaseStats, getSystemHealth, getAllCountrySyncStatus } from './database.js';
 import { buildHealthResponse } from './lib/healthResponse.js';
+import { buildReadyResponse } from './lib/readyChecks.js';
 import pool from './database.js';
 import { createPushRouter } from './push/router.js';
 import { createPushAdminRouter } from './push/adminRouter.js';
@@ -1029,6 +1030,20 @@ router.get('/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       overallStatus: 'degraded',
       issues: ['Failed to get health status'],
+    });
+  }
+});
+
+router.get('/ready', async (req, res) => {
+  try {
+    const payload = await buildReadyResponse();
+    res.status(payload.status === 'ready' ? 200 : 503).json(payload);
+  } catch (error) {
+    console.error('Error getting readiness status:', error);
+    res.status(503).json({
+      status: 'not_ready',
+      checks: { postgres: false, price_data_fresh: false },
+      error: error.message,
     });
   }
 });

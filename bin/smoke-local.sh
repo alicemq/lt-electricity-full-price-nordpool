@@ -43,6 +43,12 @@ if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
   echo ""
   echo "    (degraded during initial sync or before Postgres is ready is expected)"
 
+  echo "==> GET /ready"
+  ready_code="$(curl -s -o /tmp/nordpool-ready.json -w '%{http_code}' "${API_URL}/ready")"
+  echo "    HTTP ${ready_code}"
+  head -c 200 /tmp/nordpool-ready.json || true
+  echo ""
+
   echo "==> GET /api/v1/sync/status OK"
   curl -sf "${API_URL}/api/v1/sync/status" | head -c 200 || true
   echo ""
