@@ -17,7 +17,7 @@ Using the software under the AGPL does not require a commercial license.
 Contact the copyright holder:
 
 - **Name:** Alice MQ (alicemq)
-- **Email:** zmarkeviciai@gmail.com
+- **Email:** alio@teletigras.lt
 - **Repository:** https://github.com/alicemq/lt-electricity-full-price-nordpool
 
 Commercial terms (fees, scope, duration, support) are negotiated separately and documented in a written agreement. This file is a template summary only and is not a binding offer.
