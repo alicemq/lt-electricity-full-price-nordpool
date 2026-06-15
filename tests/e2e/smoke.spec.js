@@ -24,7 +24,7 @@ test.describe('frontend smoke', () => {
     }
   });
 
-  test('today page loads with date controls and price table', async ({ page }) => {
+  test('today page loads with date controls and price or empty state', async ({ page }) => {
     await page.goto('/today?lang=lt');
     await expect(page).toHaveURL(/\/today/);
     const todayPage = page.locator('.today-page');
@@ -32,7 +32,39 @@ test.describe('frontend smoke', () => {
     await expect(todayPage.getByRole('button', { name: 'Šiandien' })).toBeVisible();
     await expect(todayPage.getByRole('button', { name: 'Rytoj' })).toBeVisible();
     await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
-    await expect(page.locator('table.table')).toBeVisible({ timeout: 20_000 });
+
+    const dateInput = todayPage.locator('.dp__input');
+    await expect(dateInput).toBeVisible();
+    await expect(dateInput).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+
+    const table = page.locator('table.table');
+    const emptyWarning = page.getByText('Šiai datai kainų duomenys dar nepasiekiami.');
+    await expect(table.or(emptyWarning)).toBeVisible();
+
+    if (await table.isVisible()) {
+      await expect(page.getByText('Vidutinė kaina:')).toBeVisible();
+      await expect(table.locator('tbody tr').first()).toBeVisible();
+      await expect(page.getByText('0.000 ct/kWh')).toHaveCount(0);
+    } else {
+      await expect(page.getByText('0.000 ct/kWh')).toHaveCount(0);
+    }
+  });
+
+  test('today tomorrow button keeps date visible in empty-data window', async ({ page }) => {
+    await page.goto('/today?lang=lt');
+    const todayPage = page.locator('.today-page');
+    await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
+
+    await todayPage.getByRole('button', { name: 'Rytoj' }).click();
+    await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
+
+    const dateInput = todayPage.locator('.dp__input');
+    await expect(dateInput).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+
+    const table = page.locator('table.table');
+    const emptyWarning = page.getByText('Šiai datai kainų duomenys dar nepasiekiami.');
+    await expect(table.or(emptyWarning)).toBeVisible();
+    await expect(page.getByText('0.000 ct/kWh')).toHaveCount(0);
   });
 
   test('settings page loads alert and color sections', async ({ page }) => {
