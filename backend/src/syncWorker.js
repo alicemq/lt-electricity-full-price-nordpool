@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { listCronSchedules, getCronSchedule } from './lib/admin/cronSchedules.js';
 import moment from 'moment-timezone';
 import EleringAPI from './elering-api.js';
 import { isDateComplete as checkDateComplete } from './lib/sync/completeness.js';
@@ -53,6 +54,21 @@ class SyncWorker {
     this.dailySyncWatchdogInterval = null; // Watchdog to ensure sync is scheduled
     this.dailySyncFallbackCron = null; // Fallback cron job as safety net
     this.dailyScheduler = new DailySyncScheduler(this);
+    this.cronScheduleConfig = {};
+  }
+
+  async loadCronScheduleConfig() {
+    try {
+      const rows = await listCronSchedules();
+      this.cronScheduleConfig = Object.fromEntries(rows.map((row) => [row.job_key, row]));
+    } catch (error) {
+      console.warn('[Cron Schedules] Failed to load from database, using defaults:', error.message);
+      this.cronScheduleConfig = {};
+    }
+  }
+
+  getCronConfig(jobKey, fallback) {
+    return this.cronScheduleConfig[jobKey] || fallback;
   }
 
   // Start the worker
@@ -70,14 +86,38 @@ class SyncWorker {
     // Check if we need to run a startup sync
     await this.checkStartupSync();
 
+    await this.loadCronScheduleConfig();
+
     // Schedule daily sync that runs every 15 minutes from 12:45 to 16:00 UTC
     this.scheduleDailySync();
-    
-    // Schedule weekly full sync (every Sunday at 2 AM)
-    this.scheduleWeeklySync('0 2 * * 0', 'Weekly Full Sync');
 
-    // Schedule next day sync (every day at 13:30 UTC - after NordPool publishes next day data)
-    this.scheduleNextDaySync('30 13 * * *', 'Next Day Sync');
+    const weeklyConfig = this.getCronConfig('weekly_sync', {
+      cron_expression: '0 2 * * 0',
+      timezone: 'Europe/Vilnius',
+      name: 'Weekly Full Sync',
+      enabled: true,
+    });
+    if (weeklyConfig.enabled !== false) {
+      this.scheduleWeeklySync(
+        weeklyConfig.cron_expression,
+        weeklyConfig.name || 'Weekly Full Sync',
+        weeklyConfig.timezone || 'Europe/Vilnius',
+      );
+    }
+
+    const nextDayConfig = this.getCronConfig('next_day_sync', {
+      cron_expression: '30 13 * * *',
+      timezone: 'Europe/Paris',
+      name: 'Next Day Sync',
+      enabled: true,
+    });
+    if (nextDayConfig.enabled !== false) {
+      this.scheduleNextDaySync(
+        nextDayConfig.cron_expression,
+        nextDayConfig.name || 'Next Day Sync',
+        nextDayConfig.timezone || 'Europe/Paris',
+      );
+    }
 
     // Start health monitoring
     this.startHealthMonitoring();
@@ -1121,7 +1161,12 @@ class SyncWorker {
   }
 
   // Schedule weekly full sync
-  scheduleWeeklySync(cronExpression, description) {
+  scheduleWeeklySync(cronExpression, description, timezone = 'Europe/Vilnius') {
+    if (this.weeklySyncJob) {
+      this.weeklySyncJob.stop();
+      this.weeklySyncJob = null;
+    }
+
     this.weeklySyncJob = cron.schedule(cronExpression, async () => {
       console.log(`[Weekly Sync] Running ${description}...`);
       
@@ -1132,15 +1177,20 @@ class SyncWorker {
       }
     }, {
       scheduled: false,
-      timezone: 'Europe/Vilnius'
+      timezone,
     });
     
     this.weeklySyncJob.start();
-    console.log(`[Weekly Sync] Scheduled: ${cronExpression} (CET)`);
+    console.log(`[Weekly Sync] Scheduled: ${cronExpression} (${timezone})`);
   }
 
   // Schedule next day sync
-  scheduleNextDaySync(cronExpression, description) {
+  scheduleNextDaySync(cronExpression, description, timezone = 'Europe/Paris') {
+    if (this.nextDaySyncJob) {
+      this.nextDaySyncJob.stop();
+      this.nextDaySyncJob = null;
+    }
+
     this.nextDaySyncJob = cron.schedule(cronExpression, async () => {
       console.log(`[Next Day Sync] Running ${description}...`);
       
@@ -1151,11 +1201,45 @@ class SyncWorker {
       }
     }, {
       scheduled: false,
-      timezone: 'Europe/Paris' // CET/CEST timezone
+      timezone,
     });
     
     this.nextDaySyncJob.start();
-    console.log(`[Next Day Sync] Scheduled: ${cronExpression} (CET)`);
+    console.log(`[Next Day Sync] Scheduled: ${cronExpression} (${timezone})`);
+  }
+
+  async reloadCronSchedule(jobKey) {
+    const schedule = await getCronSchedule(jobKey);
+    if (!schedule) {
+      throw new Error(`Unknown cron job: ${jobKey}`);
+    }
+    if (!schedule.editable) {
+      throw new Error(`Cron job ${jobKey} is read-only`);
+    }
+
+    await this.loadCronScheduleConfig();
+
+    if (schedule.enabled === false) {
+      if (jobKey === 'weekly_sync' && this.weeklySyncJob) {
+        this.weeklySyncJob.stop();
+        this.weeklySyncJob = null;
+      }
+      if (jobKey === 'next_day_sync' && this.nextDaySyncJob) {
+        this.nextDaySyncJob.stop();
+        this.nextDaySyncJob = null;
+      }
+      return schedule;
+    }
+
+    if (jobKey === 'weekly_sync') {
+      this.scheduleWeeklySync(schedule.cron_expression, schedule.name, schedule.timezone);
+    } else if (jobKey === 'next_day_sync') {
+      this.scheduleNextDaySync(schedule.cron_expression, schedule.name, schedule.timezone);
+    } else {
+      throw new Error(`Cron job ${jobKey} cannot be reloaded`);
+    }
+
+    return schedule;
   }
 
   // Run weekly sync
@@ -1545,30 +1629,42 @@ class SyncWorker {
   getScheduledJobs() {
     const jobs = [];
     jobs.push(this.dailyScheduler.getDailySyncJobInfo((expr, tz) => this.getNextRunTime(expr, tz)));
-    
-    // Weekly sync job
+
+    const weeklyConfig = this.getCronConfig('weekly_sync', {
+      cron_expression: '0 2 * * 0',
+      timezone: 'Europe/Vilnius',
+      name: 'Weekly Sync',
+    });
     if (this.weeklySyncJob) {
-      const nextRun = this.getNextRunTime('0 2 * * 0', 'Europe/Vilnius');
+      const nextRun = this.getNextRunTime(weeklyConfig.cron_expression, weeklyConfig.timezone);
       jobs.push({
-        name: 'Weekly Sync',
-        cron: '0 2 * * 0',
-        timezone: 'Europe/Vilnius',
-        description: 'Every Sunday at 2 AM CET',
+        jobKey: 'weekly_sync',
+        name: weeklyConfig.name || 'Weekly Sync',
+        cron: weeklyConfig.cron_expression,
+        timezone: weeklyConfig.timezone,
+        description: weeklyConfig.description || 'Every Sunday at 2 AM',
+        editable: weeklyConfig.editable !== false,
         running: this.weeklySyncJob.running,
-        nextRun: nextRun
+        nextRun,
       });
     }
-    
-    // Next day sync job
+
+    const nextDayConfig = this.getCronConfig('next_day_sync', {
+      cron_expression: '30 13 * * *',
+      timezone: 'Europe/Paris',
+      name: 'Next Day Sync',
+    });
     if (this.nextDaySyncJob) {
-      const nextRun = this.getNextRunTime('30 13 * * *', 'Europe/Paris');
+      const nextRun = this.getNextRunTime(nextDayConfig.cron_expression, nextDayConfig.timezone);
       jobs.push({
-        name: 'Next Day Sync',
-        cron: '30 13 * * *',
-        timezone: 'Europe/Paris',
-        description: 'Every day at 13:30 CET',
+        jobKey: 'next_day_sync',
+        name: nextDayConfig.name || 'Next Day Sync',
+        cron: nextDayConfig.cron_expression,
+        timezone: nextDayConfig.timezone,
+        description: nextDayConfig.description || 'Every day at 13:30 Paris time',
+        editable: nextDayConfig.editable !== false,
         running: this.nextDaySyncJob.running,
-        nextRun: nextRun
+        nextRun,
       });
     }
     
@@ -2011,6 +2107,7 @@ const syncWorker = new SyncWorker();
 export const startSyncWorker = () => syncWorker.start();
 export const stopSyncWorker = () => syncWorker.stop();
 export const getSyncStatus = () => syncWorker.getStatus();
+export const reloadCronSchedule = (jobKey) => syncWorker.reloadCronSchedule(jobKey);
 
 // Export the worker instance for direct access
 export default syncWorker; 

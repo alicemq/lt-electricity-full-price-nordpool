@@ -406,3 +406,35 @@ INSERT INTO translations (entity_type, entity_key, locale, translated_label) VAL
 ON CONFLICT (entity_type, entity_key, locale) DO UPDATE
 SET translated_label = EXCLUDED.translated_label,
     updated_at = CURRENT_TIMESTAMP;
+
+-- Admin-editable cron schedules (sync worker jobs)
+CREATE TABLE IF NOT EXISTS cron_schedules (
+    job_key VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    cron_expression VARCHAR(100) NOT NULL,
+    timezone VARCHAR(50) NOT NULL DEFAULT 'Europe/Vilnius',
+    description TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    editable BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cron_schedule_audit (
+    id SERIAL PRIMARY KEY,
+    job_key VARCHAR(50) NOT NULL,
+    old_cron_expression VARCHAR(100),
+    new_cron_expression VARCHAR(100) NOT NULL,
+    old_timezone VARCHAR(50),
+    new_timezone VARCHAR(50) NOT NULL,
+    changed_by VARCHAR(100),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cron_schedule_audit_job_key ON cron_schedule_audit(job_key);
+
+INSERT INTO cron_schedules (job_key, name, cron_expression, timezone, description, editable) VALUES
+('weekly_sync', 'Weekly Full Sync', '0 2 * * 0', 'Europe/Vilnius', 'Every Sunday at 2 AM Vilnius time', true),
+('next_day_sync', 'Next Day Sync', '30 13 * * *', 'Europe/Paris', 'Every day at 13:30 Paris time after Nord Pool publish window', true),
+('daily_sync', 'Daily Release Window Sync', 'dynamic', 'Europe/Paris', 'Dynamic scheduler during Nord Pool release window (read-only)', false)
+ON CONFLICT (job_key) DO NOTHING;

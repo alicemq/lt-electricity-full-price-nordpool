@@ -1,7 +1,13 @@
 import express from 'express';
 import moment from 'moment-timezone';
-import syncWorker from './syncWorker.js';
+import syncWorker, { reloadCronSchedule } from './syncWorker.js';
 import { isInReleaseWindow } from './lib/sync/releaseWindow.js';
+import { requireAdminToken } from './lib/admin/auth.js';
+import {
+  listCronSchedules,
+  listCronScheduleAudit,
+  updateCronSchedule,
+} from './lib/admin/cronSchedules.js';
 import { getPriceData, getPriceDataAll, getLatestPrice, getCurrentPrice, getAvailableCountries, getSettings, updateSetting, getCurrentHourPrice, getLatestPriceAll, getCurrentHourPriceAll, getLatestTimestamp, logSync, getAllEarliestTimestamps, getInitialSyncStatus, getDatabaseStats, getSystemHealth, getAllCountrySyncStatus } from './database.js';
 import pool from './database.js';
 
@@ -1041,6 +1047,82 @@ router.post('/sync/reset-initial', async (req, res) => {
       success: false,
       error: 'Failed to reset initial sync status',
       details: error.message
+    });
+  }
+});
+
+// Admin: cron schedule viewer/editor (API v1)
+router.get('/admin/cron', requireAdminToken, async (req, res) => {
+  try {
+    const schedules = await listCronSchedules();
+    const runtimeJobs = syncWorker.getStatus().scheduledJobs || [];
+    const runtimeByKey = Object.fromEntries(
+      runtimeJobs.filter((job) => job.jobKey).map((job) => [job.jobKey, job]),
+    );
+
+    res.json({
+      success: true,
+      data: schedules.map((schedule) => ({
+        ...schedule,
+        runtime: runtimeByKey[schedule.job_key] || null,
+      })),
+    });
+  } catch (error) {
+    console.error('[Admin] Error listing cron schedules:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to list cron schedules',
+      details: error.message,
+    });
+  }
+});
+
+router.get('/admin/cron/audit', requireAdminToken, async (req, res) => {
+  try {
+    const { jobKey, limit } = req.query;
+    const parsedLimit = Math.min(parseInt(limit, 10) || 20, 100);
+    const rows = await listCronScheduleAudit(jobKey || null, parsedLimit);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('[Admin] Error fetching cron audit log:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch cron audit log',
+      details: error.message,
+    });
+  }
+});
+
+router.put('/admin/cron/:jobKey', requireAdminToken, async (req, res) => {
+  try {
+    const { jobKey } = req.params;
+    const { cronExpression, timezone, enabled } = req.body || {};
+    const result = await updateCronSchedule(
+      jobKey,
+      { cronExpression, timezone, enabled },
+      req.adminActor,
+    );
+
+    if (!result.ok) {
+      return res.status(result.status).json({
+        success: false,
+        error: result.error,
+      });
+    }
+
+    await reloadCronSchedule(jobKey);
+
+    res.json({
+      success: true,
+      data: result.schedule,
+      message: 'Cron schedule updated and scheduler reloaded',
+    });
+  } catch (error) {
+    console.error('[Admin] Error updating cron schedule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update cron schedule',
+      details: error.message,
     });
   }
 });
