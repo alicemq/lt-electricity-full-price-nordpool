@@ -48,7 +48,19 @@ const messages = {
       planChangeSuffix: 'portal.',
       swaggerDocs: 'API Documentation',
       systemStatus: 'System Status',
-      about: 'About & Help'
+      about: 'About & Help',
+      syncDebugTitle: 'Device sync (debug)',
+      syncDebugPhase: 'Release phase',
+      syncDebugTargetDay: 'Target release day',
+      syncDebugNextWindow: 'Next window',
+      syncDebugPoll: 'Poll interval',
+      syncDebugToday: 'Today cache (MTU)',
+      syncDebugTomorrow: 'Tomorrow cache (MTU)',
+      syncDebugGaps: 'Missing days',
+      syncDebugNoGaps: 'None',
+      syncDebugMarkers: 'Sync-success markers',
+      syncDebugRun: 'Run sync now',
+      syncDebugRunning: 'Syncing…'
     },
     table: {
       noData: 'Price data is not yet available for selected date.\nData is typically available after 15:00 local time (13:00 UTC).',
@@ -149,7 +161,19 @@ const messages = {
       planChangeSuffix: 'svetainėje.',
       swaggerDocs: 'API dokumentacija',
       systemStatus: 'Sistemos būsena',
-      about: 'Apie & Pagalba'
+      about: 'Apie & Pagalba',
+      syncDebugTitle: 'Įrenginio sinchronizacija (debug)',
+      syncDebugPhase: 'Leidimo fazė',
+      syncDebugTargetDay: 'Tikslinė leidimo diena',
+      syncDebugNextWindow: 'Kitas langas',
+      syncDebugPoll: 'Apklausos intervalas',
+      syncDebugToday: 'Šiandienos talpykla (MTU)',
+      syncDebugTomorrow: 'Rytojaus talpykla (MTU)',
+      syncDebugGaps: 'Trūkstamos dienos',
+      syncDebugNoGaps: 'Nėra',
+      syncDebugMarkers: 'Sinchronizacijos žymės',
+      syncDebugRun: 'Sinchronizuoti dabar',
+      syncDebugRunning: 'Sinchronizuojama…'
     },
     table: {
       noData: 'Šiai datai kainų duomenys dar nepasiekiami.\nDuomenys įprastai pasiekiami po 15:00 vietos laiku (13:00 UTC).',

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import PriceTable from '../components/PriceTable.vue';
-import { fetchUpcomingPrices } from '../services/priceService';
+import { fetchUpcomingPrices, onPricesUpdated, runSmartSync } from '../services/priceService';
 import { calculatePrice, logAllPriceBreakdowns } from '../services/priceCalculationService';
 import { formatPriceHours, formatLocalTime } from '../services/timeService';
 import moment from 'moment-timezone';
@@ -14,6 +14,7 @@ const isLoading = ref(true);
 const error = ref(null);
 
 let refreshTimeout = null;
+let unsubscribePrices = null;
 
 function getIntervalMs() {
   if (allPrices.value && allPrices.value.length >= 2) {
@@ -37,9 +38,10 @@ function scheduleNextRefresh() {
 
 function handleVisibilityChange() {
   if (document.visibilityState === 'visible') {
-    // If user returns after sleep or tab hidden, reload prices and reschedule
-    loadPrices();
-    scheduleNextRefresh();
+    runSmartSync('lt').finally(() => {
+      loadPrices();
+      scheduleNextRefresh();
+    });
   }
 }
 
@@ -86,11 +88,15 @@ const loadPrices = async () => {
 onMounted(() => {
   loadPrices();
   scheduleNextRefresh();
+  unsubscribePrices = onPricesUpdated(() => {
+    loadPrices();
+  });
   document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
   if (refreshTimeout) clearTimeout(refreshTimeout);
+  if (unsubscribePrices) unsubscribePrices();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>

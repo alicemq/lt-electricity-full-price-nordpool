@@ -2,6 +2,7 @@
 import { RouterLink } from 'vue-router'
 import PriceSettings from '../components/PriceSettings.vue';
 import LanguageSwitcher from '../components/LanguageSwitcher.vue';
+import SyncDebugPanel from '../components/SyncDebugPanel.vue';
 </script>
 
 <template>
@@ -68,6 +69,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher.vue';
         </div>
       </div>
     </div>
+    <SyncDebugPanel />
     <div class="text-center mt-4">
       <RouterLink to="/" class="btn btn-primary">{{ $t('settings.saveAndClose') }}</RouterLink>
     </div>

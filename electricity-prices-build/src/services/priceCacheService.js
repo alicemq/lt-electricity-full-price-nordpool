@@ -1,4 +1,15 @@
 import moment from 'moment-timezone';
+import {
+  DISPLAY_TIMEZONE,
+  getReleasePhase,
+  getTargetReleaseDay,
+  RELEASE_PHASE,
+} from '../utils/releaseWindow';
+import {
+  markDaySynced,
+  isDaySynced,
+  clearDaySync,
+} from '../utils/deviceSyncState';
 
 const CACHE_KEY = 'priceDataCache';
 const CACHE_VERSION = 1;
@@ -112,6 +123,121 @@ export function storePrices(prices, country = 'lt') {
   cleanOldData();
   
   saveCache(cache);
+  updateSyncMarkersForStoredPrices(prices, country);
+}
+
+/**
+ * Infer MTU interval from cached price records (seconds).
+ */
+export function inferMtuIntervalSeconds(prices) {
+  if (!prices || prices.length < 2) {
+    return 3600;
+  }
+  for (let i = 1; i < Math.min(prices.length, 10); i += 1) {
+    const diff = prices[i].timestamp - prices[i - 1].timestamp;
+    if (diff > 0) {
+      return diff;
+    }
+  }
+  return 3600;
+}
+
+/**
+ * Expected record count range for a Vilnius calendar day (DST-aware).
+ * Aligns with backend isDateComplete semantics.
+ */
+export function getExpectedRecordRange(intervalSeconds, recordCountHint = 0) {
+  const isFifteenMin =
+    intervalSeconds === 900 || (recordCountHint >= 90 && intervalSeconds !== 3600);
+  if (isFifteenMin) {
+    return { min: 92, max: 100, intervalSeconds: 900 };
+  }
+  return { min: 23, max: 25, intervalSeconds: 3600 };
+}
+
+/**
+ * Cached prices for one Vilnius calendar day.
+ */
+export function getCachedPricesForDay(dateStr, country = 'lt') {
+  const start = moment.tz(dateStr, DISPLAY_TIMEZONE).startOf('day');
+  const end = start.clone().endOf('day');
+  return getCachedPrices(start.toDate(), end.toDate(), country) || [];
+}
+
+/**
+ * Validate whether cached data for a day meets expected MTU count.
+ */
+export function validateDayCompleteness(dateStr, country = 'lt') {
+  const prices = getCachedPricesForDay(dateStr, country);
+  const recordCount = prices.length;
+  if (recordCount === 0) {
+    return {
+      isComplete: false,
+      recordCount: 0,
+      intervalSeconds: 3600,
+      expectedMin: 23,
+      expectedMax: 25,
+    };
+  }
+
+  const intervalSeconds = inferMtuIntervalSeconds(prices);
+  const expected = getExpectedRecordRange(intervalSeconds, recordCount);
+  const isComplete = recordCount >= expected.min && recordCount <= expected.max;
+
+  return {
+    isComplete,
+    recordCount,
+    intervalSeconds: expected.intervalSeconds,
+    expectedMin: expected.min,
+    expectedMax: expected.max,
+  };
+}
+
+function updateSyncMarkersForStoredPrices(prices, country) {
+  if (!prices || prices.length === 0) {
+    return;
+  }
+
+  const byDay = new Map();
+  prices.forEach((price) => {
+    const dayKey = moment.unix(price.timestamp).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD');
+    if (!byDay.has(dayKey)) {
+      byDay.set(dayKey, []);
+    }
+    byDay.get(dayKey).push(price);
+  });
+
+  byDay.forEach((dayPrices, dateStr) => {
+    const validation = validateDayCompleteness(dateStr, country);
+    if (validation.isComplete) {
+      markDaySynced(country, dateStr, validation);
+    } else if (isDaySynced(country, dateStr)) {
+      clearDaySync(country, dateStr);
+    }
+  });
+}
+
+/**
+ * Days that should be complete locally but are not yet sync-marked.
+ */
+export function getDaysNeedingSync(country = 'lt', now = moment()) {
+  const phase = getReleasePhase(now);
+  const nowVilnius = now.clone().tz(DISPLAY_TIMEZONE);
+  const today = nowVilnius.format('YYYY-MM-DD');
+  const tomorrow = getTargetReleaseDay(now);
+  const candidates = [today];
+
+  if (phase === RELEASE_PHASE.AFTER || phase === RELEASE_PHASE.DURING) {
+    candidates.push(tomorrow);
+  }
+
+  return candidates.filter((dateStr) => {
+    if (isDaySynced(country, dateStr)) {
+      return false;
+    }
+    const validation = validateDayCompleteness(dateStr, country);
+    return !validation.isComplete;
+  });
 }
 
 /**
@@ -175,102 +301,77 @@ export function getCacheStats() {
  * Historical gaps are not checked here - they're fetched on-demand when user requests them
  * Data typically extends only to tomorrow + some hours of day after tomorrow
  */
-export function detectFutureGaps(country = 'lt') {
-  const cache = getCache();
-  const countryKey = country.toLowerCase();
-  const countryData = cache.data[countryKey] || [];
-  
-  const now = moment().tz('Europe/Vilnius');
-  const nowTs = now.unix();
-  const hour = now.hour();
-  
-  // Only check future data (from now onwards)
-  const futureData = countryData.filter(p => p.timestamp >= nowTs);
-  
-  if (futureData.length === 0) {
-    return { hasGaps: true, missingRanges: [] };
-  }
-  
-  // Determine what FUTURE data should be available
-  const shouldHaveTomorrow = hour >= 15; // After 15:00 CET, tomorrow's data should be available
-  
-  // Get date ranges we should have (future only)
-  const today = now.clone().startOf('day');
-  const tomorrow = now.clone().add(1, 'day').startOf('day');
-  // Day after tomorrow - only expect some hours (typically up to 12-18 hours ahead)
-  const maxExpectedTime = now.clone().add(2, 'days').add(18, 'hours'); // Max: day after tomorrow + 18 hours
-  
-  // Check what we have (future data only)
-  const todayStart = today.unix();
-  const todayEnd = today.clone().endOf('day').unix();
-  const tomorrowStart = tomorrow.unix();
-  const tomorrowEnd = tomorrow.clone().endOf('day').unix();
-  const maxExpectedTs = maxExpectedTime.unix();
-  
-  const hasToday = futureData.some(p => p.timestamp >= todayStart && p.timestamp <= todayEnd);
-  const hasTomorrow = futureData.some(p => p.timestamp >= tomorrowStart && p.timestamp <= tomorrowEnd);
-  
-  // Check if we have data up to the expected maximum (tomorrow + some hours of day after)
-  const latestCached = futureData.length > 0 ? Math.max(...futureData.map(p => p.timestamp)) : 0;
-  const hasEnoughFutureData = latestCached >= maxExpectedTs;
-  
+export function detectFutureGaps(country = 'lt', now = moment()) {
+  const nowVilnius = now.clone().tz(DISPLAY_TIMEZONE);
+  const nowTs = nowVilnius.unix();
+  const phase = getReleasePhase(now);
+  const tomorrowStr = getTargetReleaseDay(now);
+  const todayStr = nowVilnius.format('YYYY-MM-DD');
+
+  const countryData = getCache().data[country.toLowerCase()] || [];
+  const futureData = countryData.filter((p) => p.timestamp >= nowTs);
+
+  const todayValidation = validateDayCompleteness(todayStr, country);
+  const tomorrowValidation = validateDayCompleteness(tomorrowStr, country);
+  const shouldHaveTomorrow =
+    phase === RELEASE_PHASE.DURING || phase === RELEASE_PHASE.AFTER;
+
   const missingRanges = [];
-  
-  // Check if we're missing today's future data (from now to end of day)
-  if (!hasToday || (hasToday && latestCached < todayEnd && latestCached < nowTs + 3600)) {
-    // Missing current/future part of today
-    missingRanges.push({ start: now.toDate(), end: today.clone().endOf('day').toDate() });
-  }
-  
-  // Check if we're missing tomorrow's data (if it should be available)
-  if (shouldHaveTomorrow && !hasTomorrow) {
-    missingRanges.push({ start: tomorrow.toDate(), end: tomorrow.clone().endOf('day').toDate() });
-  }
-  
-  // Check if we're missing future data (but only up to the realistic maximum)
-  // If we have tomorrow but not enough hours of day after, we might be missing some
-  if (hasTomorrow && !hasEnoughFutureData && latestCached < maxExpectedTs) {
-    // We have tomorrow but missing some hours of day after tomorrow
-    const missingStart = latestCached > 0 ? moment.unix(latestCached).add(1, 'hour') : tomorrow.clone().add(1, 'day');
-    missingRanges.push({ 
-      start: missingStart.toDate(), 
-      end: maxExpectedTime.toDate() 
-    });
-  } else if (!hasTomorrow && shouldHaveTomorrow) {
-    // Missing tomorrow entirely
-    missingRanges.push({ 
-      start: tomorrow.toDate(), 
-      end: maxExpectedTime.toDate() 
+  const missingDays = getDaysNeedingSync(country, now);
+
+  if (!todayValidation.isComplete) {
+    missingRanges.push({
+      start: nowVilnius.toDate(),
+      end: nowVilnius.clone().endOf('day').toDate(),
+      date: todayStr,
     });
   }
-  
+
+  if (shouldHaveTomorrow && !tomorrowValidation.isComplete) {
+    const tomorrowStart = moment.tz(tomorrowStr, DISPLAY_TIMEZONE).startOf('day');
+    missingRanges.push({
+      start: tomorrowStart.toDate(),
+      end: tomorrowStart.clone().endOf('day').toDate(),
+      date: tomorrowStr,
+    });
+  }
+
+  const latestCached =
+    futureData.length > 0 ? Math.max(...futureData.map((p) => p.timestamp)) : 0;
+
   return {
-    hasGaps: missingRanges.length > 0,
+    hasGaps: missingRanges.length > 0 || missingDays.length > 0,
     missingRanges,
-    hasToday,
-    hasTomorrow,
+    missingDays,
+    phase,
+    hasToday: todayValidation.isComplete,
+    hasTomorrow: tomorrowValidation.isComplete,
     shouldHaveTomorrow,
-    latestCached: latestCached > 0 ? moment.unix(latestCached).format('YYYY-MM-DD HH:mm') : null,
-    maxExpected: maxExpectedTime.format('YYYY-MM-DD HH:mm')
+    todaySynced: isDaySynced(country, todayStr),
+    tomorrowSynced: isDaySynced(country, tomorrowStr),
+    latestCached:
+      latestCached > 0 ? moment.unix(latestCached).format('YYYY-MM-DD HH:mm') : null,
   };
 }
 
 /**
  * Check if cache needs initialization (empty or stale)
  */
-export function needsInitialization() {
+export function needsInitialization(country = 'lt', now = moment()) {
   const cache = getCache();
-  const hasData = Object.keys(cache.data).length > 0 && 
-                  Object.values(cache.data).some(arr => arr.length > 0);
-  
-  if (!hasData) return true;
-  
-  // Check if we have recent data (within last hour)
-  const oneHourAgo = moment().tz('Europe/Vilnius').subtract(1, 'hour').unix();
-  const hasRecentData = Object.values(cache.data).some(arr => 
-    arr.some(price => price.timestamp >= oneHourAgo)
-  );
-  
-  return !hasRecentData;
+  const countryData = cache.data[country.toLowerCase()] || [];
+  if (countryData.length === 0) {
+    return true;
+  }
+
+  const phase = getReleasePhase(now);
+  if (phase === RELEASE_PHASE.BEFORE) {
+    const today = now.clone().tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD');
+    return !validateDayCompleteness(today, country).isComplete;
+  }
+
+  return getDaysNeedingSync(country, now).length > 0;
 }
+
+export { isDaySynced, getDaySyncMarker, getCountrySyncMarkers } from '../utils/deviceSyncState';
 

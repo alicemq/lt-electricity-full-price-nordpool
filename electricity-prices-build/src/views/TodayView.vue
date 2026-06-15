@@ -2,7 +2,7 @@
 import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { RouterLink } from 'vue-router'
 import moment from 'moment-timezone';
-import { fetchPrices } from '../services/priceService';
+import { fetchPrices, onPricesUpdated, runSmartSync } from '../services/priceService';
 import { logAllPriceBreakdowns } from '../services/priceCalculationService';
 import PriceTable from '../components/PriceTable.vue';
 
@@ -14,6 +14,7 @@ const priceData = ref([]);
 const nextDay = moment().add(1, 'days').format('YYYY-MM-DD');
 
 let refreshTimeout = null;
+let unsubscribePrices = null;
 
 function getIntervalMs() {
   if (priceData.value && priceData.value.length >= 2) {
@@ -37,8 +38,10 @@ function scheduleNextRefresh() {
 
 function handleVisibilityChange() {
   if (document.visibilityState === 'visible') {
-    reloadPrices();
-    scheduleNextRefresh();
+    runSmartSync('lt').finally(() => {
+      reloadPrices();
+      scheduleNextRefresh();
+    });
   }
 }
 
@@ -57,11 +60,15 @@ async function reloadPrices() {
 onMounted(() => {
   reloadPrices();
   scheduleNextRefresh();
+  unsubscribePrices = onPricesUpdated(() => {
+    reloadPrices();
+  });
   document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
   if (refreshTimeout) clearTimeout(refreshTimeout);
+  if (unsubscribePrices) unsubscribePrices();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
