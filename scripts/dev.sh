@@ -3,11 +3,16 @@
 # Development startup script
 echo "🚀 Starting Electricity Prices in Development Mode..."
 
-# Copy development environment
-cp .env.development .env
+# Local env files are gitignored — seed from .env.example on first run
+ENV_FILE=".env.development"
+if [ ! -f "$ENV_FILE" ]; then
+  cp .env.example "$ENV_FILE"
+  echo "Created $ENV_FILE from .env.example — review values before use."
+fi
+cp "$ENV_FILE" .env
 
 # Build and start services with development override
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.development up -d --build
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file "$ENV_FILE" up -d --build
 
 echo "✅ Development environment started!"
 echo ""
