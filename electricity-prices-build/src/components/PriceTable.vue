@@ -211,7 +211,7 @@ const groupedByHour = computed(() => {
   <div v-if="!hasEnoughData" class="alert alert-warning" role="alert">
     <span v-html="$t('table.noData').replace('\n', '<br>')"></span>
   </div>
-  <div class="table-responsive">
+  <div v-else class="table-responsive">
     <table class="table table-hover align-middle">
       <thead>
         <tr>

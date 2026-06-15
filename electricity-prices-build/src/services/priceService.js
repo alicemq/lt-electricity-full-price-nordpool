@@ -187,6 +187,39 @@ export async function fetchUpcomingPrices(country = 'lt', forceRefresh = false) 
       console.log('[Cache] Using cached upcoming data as fallback');
       return buildCachedResponse(cached, country, { phase, offline: true });
     }
+
+    const noDataInDb =
+      error.response?.status === 404 &&
+      error.response?.data?.code === 'NO_DATA_FOUND';
+
+    if (noDataInDb) {
+      console.log('[SmartSync] Upcoming empty in DB; bootstrapping today and tomorrow');
+      try {
+        const today = moment().tz(DISPLAY_TIMEZONE);
+        await fetchPrices(today.toDate(), country, { force: true });
+        await fetchPrices(today.clone().add(1, 'day').toDate(), country, { force: true });
+
+        const bootstrapped = getCachedUpcomingPrices(country);
+        if (bootstrapped && bootstrapped.length > 0) {
+          return buildCachedResponse(bootstrapped, country, { phase, bootstrapped: true });
+        }
+
+        const retry = await axios.get(apiUrl);
+        const retryData = retry.data;
+        if (retryData.success && retryData.data?.[country.toLowerCase()]) {
+          storeAndNotify(retryData.data[country.toLowerCase()], country);
+        }
+        return retryData;
+      } catch (bootstrapError) {
+        console.error('[SmartSync] Upcoming bootstrap failed:', bootstrapError);
+        const bootstrapped = getCachedUpcomingPrices(country);
+        if (bootstrapped && bootstrapped.length > 0) {
+          return buildCachedResponse(bootstrapped, country, { phase, bootstrapped: true, offline: true });
+        }
+        return buildCachedResponse([], country, { phase, noData: true });
+      }
+    }
+
     throw error;
   }
 }
