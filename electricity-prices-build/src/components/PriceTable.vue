@@ -4,6 +4,7 @@ import moment from 'moment-timezone';
 import { formatPriceHours, isCurrentHour } from '../services/timeService';
 import { calculatePrice, getTimePeriod } from '../services/priceCalculationService';
 import { getPriceClass } from '../utils/priceColor';
+import { getColorThresholdSettings } from '../services/alertSettingsService';
 
 const props = defineProps({
   priceData: {
@@ -55,12 +56,7 @@ watch(() => props.priceData, (newData) => {
   }
 }, { deep: true });
 
-const settings = ref(JSON.parse(localStorage.getItem('priceSettings')) || {
-  cheapThreshold: 20,
-  expensiveThreshold: 50,
-  cheapRange: 15,
-  expensiveRange: 15
-});
+const settings = ref(getColorThresholdSettings());
 
 const averagePrice = computed(() => {
   // Use allPriceData for average calculation if provided, otherwise use priceData
