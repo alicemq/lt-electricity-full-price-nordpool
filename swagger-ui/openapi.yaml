@@ -257,6 +257,10 @@ paths:
         - DST-aware timestamp handling
         - Optimized database queries
         
+        **Data source:** Primary ingestion is the background sync worker. When the database
+        is empty or incomplete for the requested date, this endpoint may perform a one-time
+        backup fetch from the Elering API before responding (see issue #11 for demotion plan).
+        
         **Usage Examples:**
         - Single day: `?date=2025-06-26&country=lt`
         - Date range: `?start=2025-06-01&end=2025-06-30&country=ee`

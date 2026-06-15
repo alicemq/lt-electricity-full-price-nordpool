@@ -52,6 +52,7 @@ jobs:
         run: |
           test -f AGENTS.md
           test -f .env.example
+          test -f electricity-prices-build/.env.example
           test -f swagger-ui/openapi.yaml
           test -f deploy/local.env.example
           test -f bin/smoke-local.sh
@@ -67,7 +68,7 @@ jobs:
 
   secret-scan:
     runs-on: ubuntu-latest
-    if: ${{ vars.CI_GITLEAKS_ENABLED != '0' }}
+    if: ${{ env.CI_GITLEAKS_ENABLED != '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
