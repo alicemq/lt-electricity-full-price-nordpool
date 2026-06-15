@@ -13,6 +13,13 @@ const messages = {
       today: 'Today',
       tomorrow: 'Tomorrow'
     },
+    display: {
+      invalidTitle: 'Invalid display link',
+      invalidBody: 'This shared layout link is missing or could not be decoded. Ask the sender for a new link.',
+      loading: 'Loading display...',
+      error: 'Failed to load prices for this display.',
+      empty: 'No price data available for this display.'
+    },
     upcoming: {
       title: 'Upcoming Prices',
       loading: 'Loading prices...',
@@ -60,7 +67,31 @@ const messages = {
       syncDebugNoGaps: 'None',
       syncDebugMarkers: 'Sync-success markers',
       syncDebugRun: 'Run sync now',
-      syncDebugRunning: 'Syncing…'
+      syncDebugRunning: 'Syncing…',
+      alertsTitle: 'Price alerts',
+      alertsHelp: 'Configure once: in-app highlights and push use the same thresholds above.',
+      alertCountry: 'Alert country',
+      alertChannels: 'Alert channels',
+      cheapInApp: 'In-app highlight when price is below {value} ct/kWh',
+      cheapPush: 'Push when price is below {value} ct/kWh',
+      expensiveInApp: 'In-app highlight when price is above {value} ct/kWh',
+      expensivePush: 'Push when price is above {value} ct/kWh',
+      quietHoursEnabled: 'Quiet hours (no push)',
+      quietHoursHelp: 'Push alerts are paused during quiet hours ({timezone}).',
+      quietHoursStart: 'Start',
+      quietHoursEnd: 'End',
+      pushPermissionStatus: 'Notification permission: {status}',
+      pushSubscribed: 'Push subscription is active.',
+      pushWorking: 'Updating push subscription…',
+      pushEnabled: 'Push alerts enabled.',
+      pushDisabled: 'Push alerts disabled.',
+      pushPendingBackend: 'Push preference saved locally. Server push will activate when available.',
+      pushUnsupported: 'This browser does not support Web Push.',
+      pushIosStandalone: 'On iOS, add the app to your home screen before enabling push.',
+      pushPermissionDenied: 'Notification permission was denied.',
+      pushSubscribeFailed: 'Could not enable push notifications.',
+      countries: { lt: 'Lithuania', ee: 'Estonia', lv: 'Latvia', fi: 'Finland' },
+      pushPermission: { granted: 'granted', denied: 'denied', default: 'not requested', unsupported: 'unsupported' }
     },
     table: {
       noData: 'Price data is not yet available for selected date.\nData is typically available after 15:00 local time (13:00 UTC).',
@@ -126,6 +157,13 @@ const messages = {
       today: 'Šiandien',
       tomorrow: 'Rytoj'
     },
+    display: {
+      invalidTitle: 'Netinkama rodinio nuoroda',
+      invalidBody: 'Bendrinamos išdėstymo nuorodos trūksta arba jos nepavyko iššifruoti. Paprašykite naujos nuorodos.',
+      loading: 'Kraunamas rodinys...',
+      error: 'Nepavyko įkelti kainų šiam rodiniui.',
+      empty: 'Šiam rodiniui kainų duomenų nėra.'
+    },
     upcoming: {
       title: 'Artimiausios kainos',
       loading: 'Kraunamos kainos...',
@@ -173,7 +211,31 @@ const messages = {
       syncDebugNoGaps: 'Nėra',
       syncDebugMarkers: 'Sinchronizacijos žymės',
       syncDebugRun: 'Sinchronizuoti dabar',
-      syncDebugRunning: 'Sinchronizuojama…'
+      syncDebugRunning: 'Sinchronizuojama…',
+      alertsTitle: 'Kainų įspėjimai',
+      alertsHelp: 'Nustatykite vieną kartą: programėlėje ir push pranešimai naudoja tuos pačius slenksčius aukščiau.',
+      alertCountry: 'Įspėjimų šalis',
+      alertChannels: 'Įspėjimų kanalai',
+      cheapInApp: 'Programėlėje, kai kaina žemiau {value} ct/kWh',
+      cheapPush: 'Push, kai kaina žemiau {value} ct/kWh',
+      expensiveInApp: 'Programėlėje, kai kaina aukščiau {value} ct/kWh',
+      expensivePush: 'Push, kai kaina aukščiau {value} ct/kWh',
+      quietHoursEnabled: 'Ramybės valandos (be push)',
+      quietHoursHelp: 'Push įspėjimai sustabdomi ramybės valandomis ({timezone}).',
+      quietHoursStart: 'Pradžia',
+      quietHoursEnd: 'Pabaiga',
+      pushPermissionStatus: 'Pranešimų leidimas: {status}',
+      pushSubscribed: 'Push prenumerata aktyvi.',
+      pushWorking: 'Atnaujinama push prenumerata…',
+      pushEnabled: 'Push įspėjimai įjungti.',
+      pushDisabled: 'Push įspėjimai išjungti.',
+      pushPendingBackend: 'Push nuostatos išsaugotos lokaliai. Serverio push įsijungs, kai bus pasiekiamas.',
+      pushUnsupported: 'Ši naršyklė nepalaiko Web Push.',
+      pushIosStandalone: 'iOS: prieš įjungiant push, pridėkite programėlę į pradžios ekraną.',
+      pushPermissionDenied: 'Pranešimų leidimas atmestas.',
+      pushSubscribeFailed: 'Nepavyko įjungti push pranešimų.',
+      countries: { lt: 'Lietuva', ee: 'Estija', lv: 'Latvija', fi: 'Suomija' },
+      pushPermission: { granted: 'suteiktas', denied: 'atmestas', default: 'neprašyta', unsupported: 'nepalaikoma' }
     },
     table: {
       noData: 'Šiai datai kainų duomenys dar nepasiekiami.\nDuomenys įprastai pasiekiami po 15:00 vietos laiku (13:00 UTC).',
