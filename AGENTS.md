@@ -2,16 +2,25 @@
 
 **Read this first.** This repo tracks Baltic NordPool electricity prices (LT, EE, LV, FI) via a Vue 3 frontend, Express API, and PostgreSQL.
 
-## Cornerstone: flows v0.6.1
+## Cornerstone: flows v0.6.2
 
-Agent workflow patterns come from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.1**. Install or refresh templates:
+Agent workflow patterns come from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.2**. Install or refresh templates:
 
 ```bash
-git clone --depth 1 --branch v0.6.1 https://github.com/alicemq/flows.git /tmp/flows
+git clone --depth 1 --branch v0.6.2 https://github.com/alicemq/flows.git /tmp/flows
 /tmp/flows/install.sh --target . --phase ua0 --project-name nordpool
 ```
 
 Reference checklist: `examples/nordpool-revamp-checklist.md` in flows. Phase 0/1 (this repo) covers UA0 hygiene and partial UA1/UA2; see GitHub issues #2 (UA0), #3 (secrets), #4 (CI).
+
+## Flows sync ritual
+
+When flows ships a tag relevant to this adopter, sync templates before starting a new revamp slice:
+
+1. **Pin tag** — record the flows version in this file (`Cornerstone` above). Prefer tagged releases over `main`.
+2. **Upgrade** — shallow-clone the tag, run `install.sh` for the target phase only (e.g. `--phase ua0`, then `--phase ua2` when CI/env work starts). Review the diff; commit product-specific fills separately from generic template copies.
+3. **Upstream gaps** — debt or missing patterns discovered during adoption MUST be filed in [flows/issues](https://github.com/alicemq/flows/issues) with `source:ai` and a link back here. Do not fork flows conventions silently in this repo.
+4. **Adopter checklist** — walk `examples/nordpool-revamp-checklist.md` row by row; mark exit criteria in the matching GitHub issue or PR. Blockers table at the top requires human decisions before UA0 feature work.
 
 ## What this product is
 
