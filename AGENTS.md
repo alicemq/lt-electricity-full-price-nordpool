@@ -127,6 +127,17 @@ LFS path: `data/db-backup/*.sql.gz`. Details: [docs/ops/db-backup-lfs.md](docs/o
 
 **Exceptions:** typos in files already changed in the same PR; explicit hotfix (open follow-up issue).
 
+## Product Owner policy
+
+The Product Owner does **not** manually merge PRs or perform code review. Agents own quality gates and delivery.
+
+Agents **MUST**:
+
+- Run CI locally before pushing (`npm test`, frontend build, compose config as applicable).
+- Squash-merge when required GitHub checks pass (Gitleaks, lint-and-unit, and any job marked required).
+- Fix CI failures and retry; rebase dependent stacked PRs onto `main` after each merge.
+- Continue the work loop without waiting for PO approval unless blocked (merge conflict, failing checks, or explicit user hold).
+
 ## Work loop (revamp and adoption)
 
 When executing a revamp phase or adoption slice, agents MUST NOT stop after the first deliverable while scoped work remains.
