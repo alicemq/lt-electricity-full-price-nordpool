@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import moment from 'moment-timezone';
 import { getDatabaseStats, getSystemHealth } from './database.js';
+import { buildHealthResponse } from './lib/healthResponse.js';
 import v1Router from './v1.js';
 import { legacyApiShim } from './legacyApi.js';
 import { startSyncWorker, stopSyncWorker, getSyncStatus } from './syncWorker.js';
@@ -48,55 +49,12 @@ app.get('/health', async (req, res) => {
     const health = await getSystemHealth();
     const stats = await getDatabaseStats();
     const syncStatus = getSyncStatus();
-
-    const response = {
-      success: true,
-      timestamp: new Date().toISOString(),
-      system: {
-        ...health.system,
-        uptime: `${Math.floor(health.system.uptime / 3600)} hours`,
-      },
-      database: {
-        ...health.database,
-        stats: {
-          totalRecords: stats.totalRecords,
-          countries: stats.countries,
-          databaseSize: stats.databaseSize,
-          tableSizes: stats.tableSizes,
-        },
-      },
-      sync: {
-        ...health.sync,
-        worker: syncStatus,
-        recentActivity: stats.recentSyncs,
-        statistics: stats.syncStats,
-      },
-      scheduledJobs: syncStatus.scheduledJobs,
-      dataFreshness: health.sync.dataFreshness,
-    };
-
-    const isHealthy = health.database.connected
-      && health.sync.dataFreshness.every((country) => country.isRecent)
-      && syncStatus.isRunning;
-
-    response.overallStatus = isHealthy ? 'healthy' : 'degraded';
-    response.issues = [];
-
-    if (!health.database.connected) {
-      response.issues.push('Database connection failed');
-    }
-
-    const staleData = health.sync.dataFreshness.filter((country) => !country.isRecent);
-    if (staleData.length > 0) {
-      response.issues.push(
-        `Stale data detected: ${staleData.map((c) => `${c.country.toUpperCase()} (${c.hoursOld}h old)`).join(', ')}`,
-      );
-    }
-
-    if (!syncStatus.isRunning) {
-      response.issues.push('Sync worker not running');
-    }
-
+    const response = buildHealthResponse({
+      health,
+      stats,
+      syncStatus,
+      requireSyncWorker: true,
+    });
     res.status(200).json(response);
   } catch (error) {
     console.error('Error getting health status:', error);
@@ -106,6 +64,7 @@ app.get('/health', async (req, res) => {
       details: error.message,
       timestamp: new Date().toISOString(),
       overallStatus: 'degraded',
+      issues: ['Failed to get health status'],
     });
   }
 });
