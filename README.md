@@ -44,6 +44,19 @@ cp .env.example .env.development
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.development up -d --build
 ```
 
+#### **Empty database (fresh volume)**
+A new Postgres volume triggers **historical initial sync** from 2012 (can take hours). Until recent rows exist, `/api/v1/nps/prices/upcoming` returns 404 and `/health` may report **degraded** status.
+
+**Fast path (< 5 min):** restore the LFS backup after the stack is up:
+```bash
+./bin/restore-db-lfs.sh --fresh-volume   # uses data/db-backup/*.sql.gz
+```
+See [docs/ops/db-backup-lfs.md](./docs/ops/db-backup-lfs.md) and [docs/ops/backup-restore.md](./docs/ops/backup-restore.md).
+
+**Alternative:** wait for initial sync to complete. Track progress via `GET /api/v1/sync/status` (`initialSync` fields) or backend logs.
+
+**CI-sized fixture:** [database/fixtures/ci_seed.sql](./database/fixtures/ci_seed.sql) for integration tests and golden harness (not a full historical dataset).
+
 #### **CapRover Deployment (Cloud)**
 ```bash
 # Prepare for CapRover deployment

@@ -42,6 +42,7 @@ if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
   echo "==> GET /health OK"
   curl -sf "${API_URL}/health" | head -c 200 || true
   echo ""
+  echo "    (degraded during initial sync or before Postgres is ready is expected)"
 
   echo "==> GET /api/v1/sync/status OK"
   curl -sf "${API_URL}/api/v1/sync/status" | head -c 200 || true
