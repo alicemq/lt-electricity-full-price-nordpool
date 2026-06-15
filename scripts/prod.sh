@@ -4,11 +4,16 @@
 echo "🚀 Starting Electricity Prices in Production Mode..."
 
 # Local env files are gitignored — seed from .env.example on first run
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/lib/ensure-local-secrets.sh"
+
 ENV_FILE=".env.production"
 if [ ! -f "$ENV_FILE" ]; then
   cp .env.example "$ENV_FILE"
-  echo "Created $ENV_FILE from .env.example — set strong POSTGRES_PASSWORD before production use."
+  echo "Created $ENV_FILE from .env.example."
 fi
+ensure_postgres_secrets_in_file "$ENV_FILE" || true
 cp "$ENV_FILE" .env
 
 # Build and start services
