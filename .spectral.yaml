@@ -1,21 +1,4 @@
+extends: spectral:oas
 rules:
-  openapi-version:
-    description: OpenAPI version must be 3.x
-    given: $
-    then:
-      field: openapi
-      function: pattern
-      functionOptions:
-        match: ^3\.
-  info-version-present:
-    description: info.version is required
-    given: $.info
-    then:
-      field: version
-      function: truthy
-  paths-defined:
-    description: paths object must be defined
-    given: $
-    then:
-      field: paths
-      function: truthy
+  operation-description: warn
+  operation-tag-defined: warn

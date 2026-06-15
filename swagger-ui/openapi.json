@@ -11,10 +11,6 @@
     "license": {
       "name": "AGPL-3.0-only",
       "url": "https://www.gnu.org/licenses/agpl-3.0.html"
-    },
-    "externalDocs": {
-      "description": "Project Documentation",
-      "url": "https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/README.md"
     }
   },
   "servers": [
@@ -34,6 +30,7 @@
   "paths": {
     "/health": {
       "get": {
+        "operationId": "getHealth",
         "summary": "Comprehensive health check",
         "description": "Returns system health, database statistics, sync status, scheduled jobs, and chunked sync progress. Useful for monitoring and diagnostics.\n",
         "tags": [
@@ -69,13 +66,15 @@
                     "scheduledJobs": {
                       "type": "array",
                       "items": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                       }
                     },
                     "dataFreshness": {
                       "type": "array",
                       "items": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": true
                       }
                     },
                     "issues": {
@@ -192,7 +191,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getCountries"
       }
     },
     "/nps/price/{country}/latest": {
@@ -272,7 +272,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getNpsPriceCountryLatest"
       }
     },
     "/nps/price/{country}/current": {
@@ -352,7 +353,7 @@
                     "timezone": "Europe/Vilnius",
                     "timestamp_local": 1750885200,
                     "price_unit": "EUR/MWh",
-                    "data_type": "current_interval",
+                    "data_type": "current_hour",
                     "current_time_local": "2025-06-26 00:15:30",
                     "is_current_hour": true
                   }
@@ -370,7 +371,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getNpsPriceCountryCurrent"
       }
     },
     "/nps/prices": {
@@ -686,7 +688,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getNpsPrices"
       }
     },
     "/nps/prices/upcoming": {
@@ -818,7 +821,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getNpsPricesUpcoming"
       }
     },
     "/latest": {
@@ -900,7 +904,7 @@
                     {
                       "timestamp": 1750885200,
                       "price": 75,
-                      "country": "lt"
+                      "country": "LT"
                     }
                   ],
                   "meta": {
@@ -923,7 +927,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getLatest"
       }
     },
     "/prices": {
@@ -977,7 +982,8 @@
           "302": {
             "description": "Redirect to /nps/prices with preserved query string"
           }
-        }
+        },
+        "operationId": "getPrices"
       }
     },
     "/settings": {
@@ -1009,7 +1015,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getSettings"
       }
     },
     "/settings/{key}": {
@@ -1083,7 +1090,9 @@
               }
             }
           }
-        }
+        },
+        "operationId": "putSettingsKey",
+        "description": "Update a setting"
       }
     },
     "/sync/status": {
@@ -1123,29 +1132,20 @@
                         "scheduledJobs": {
                           "type": "array",
                           "items": {
-                            "type": "object"
+                            "type": "object",
+                            "additionalProperties": true
                           }
                         },
                         "currentSync": {
                           "type": "object",
-                          "nullable": true
+                          "nullable": true,
+                          "additionalProperties": true
                         },
                         "syncInProgress": {
                           "type": "boolean"
                         }
                       }
                     }
-                  }
-                },
-                "example": {
-                  "success": true,
-                  "data": {
-                    "isRunning": false,
-                    "startTime": null,
-                    "lastHealthCheck": "2026-06-15T10:30:00.000Z",
-                    "scheduledJobs": [],
-                    "currentSync": null,
-                    "syncInProgress": false
                   }
                 }
               }
@@ -1161,7 +1161,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getSyncStatus"
       }
     },
     "/sync/trigger": {
@@ -1280,7 +1281,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "postSyncTrigger"
       }
     },
     "/sync/historical": {
@@ -1333,7 +1335,9 @@
           "500": {
             "description": "Historical sync failed"
           }
-        }
+        },
+        "operationId": "postSyncHistorical",
+        "description": "Sync historical data for a date range"
       }
     },
     "/sync/year": {
@@ -1380,7 +1384,9 @@
           "500": {
             "description": "Year sync failed"
           }
-        }
+        },
+        "operationId": "postSyncYear",
+        "description": "Sync all data for a specific year"
       }
     },
     "/sync/years": {
@@ -1431,7 +1437,9 @@
           "500": {
             "description": "Year range sync failed"
           }
-        }
+        },
+        "operationId": "postSyncYears",
+        "description": "Sync data for a range of years"
       }
     },
     "/sync/all-historical": {
@@ -1469,7 +1477,8 @@
           "500": {
             "description": "All historical sync failed"
           }
-        }
+        },
+        "operationId": "postSyncAll-historical"
       }
     },
     "/sync/efficient": {
@@ -1486,7 +1495,8 @@
           "500": {
             "description": "Efficient sync failed"
           }
-        }
+        },
+        "operationId": "postSyncEfficient"
       }
     },
     "/sync/all-countries-historical": {
@@ -1529,7 +1539,9 @@
           "500": {
             "description": "Sync failed"
           }
-        }
+        },
+        "operationId": "postSyncAll-countries-historical",
+        "description": "Historical sync for all countries in parallel"
       }
     },
     "/sync/all-countries-all-historical": {
@@ -1546,7 +1558,8 @@
           "500": {
             "description": "Sync failed"
           }
-        }
+        },
+        "operationId": "postSyncAll-countries-all-historical"
       }
     },
     "/sync/reset-initial": {
@@ -1589,7 +1602,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "postSyncReset-initial"
       }
     },
     "/configurations": {
@@ -1846,7 +1860,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getConfigurations"
       }
     },
     "/sync/initial-status": {
@@ -1891,16 +1906,6 @@
                       }
                     }
                   }
-                },
-                "example": {
-                  "success": true,
-                  "data": {
-                    "isComplete": true,
-                    "completedDate": "2025-06-29",
-                    "recordsCount": 123456,
-                    "completedAt": "2025-06-26T21:20:21.088Z",
-                    "lastError": null
-                  }
                 }
               }
             }
@@ -1915,7 +1920,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getSyncInitial-status"
       }
     },
     "/sync/date-complete/{date}": {
@@ -1960,7 +1966,9 @@
           "500": {
             "description": "Failed to check completeness"
           }
-        }
+        },
+        "operationId": "getSyncDate-completeDate",
+        "description": "Check data completeness for a date"
       }
     },
     "/sync/recent-completeness": {
@@ -2002,7 +2010,9 @@
           "500": {
             "description": "Failed to check recent completeness"
           }
-        }
+        },
+        "operationId": "getSyncRecent-completeness",
+        "description": "Check today and yesterday completeness"
       }
     },
     "/admin/cron": {
@@ -2027,7 +2037,8 @@
           "503": {
             "description": "Admin API not configured"
           }
-        }
+        },
+        "operationId": "getAdminCron"
       }
     },
     "/admin/cron/audit": {
@@ -2062,7 +2073,9 @@
           "200": {
             "description": "Audit log entries"
           }
-        }
+        },
+        "operationId": "getAdminCronAudit",
+        "description": "Cron schedule change audit log (admin)"
       }
     },
     "/admin/cron/{jobKey}": {
@@ -2117,7 +2130,9 @@
           "404": {
             "description": "Unknown job key"
           }
-        }
+        },
+        "operationId": "putAdminCronJobKey",
+        "description": "Update cron schedule (admin)"
       }
     },
     "/push/vapid-public": {
@@ -2133,7 +2148,9 @@
           "503": {
             "description": "Push not configured"
           }
-        }
+        },
+        "operationId": "getPushVapid-public",
+        "description": "Get VAPID public key for push subscription"
       }
     },
     "/push/status": {
@@ -2146,7 +2163,9 @@
           "200": {
             "description": "Configuration status"
           }
-        }
+        },
+        "operationId": "getPushStatus",
+        "description": "Whether push is configured on the server"
       }
     },
     "/push/subscribe": {
@@ -2175,7 +2194,9 @@
           "503": {
             "description": "Push not configured"
           }
-        }
+        },
+        "operationId": "postPushSubscribe",
+        "description": "Register web push subscription"
       },
       "delete": {
         "summary": "Deactivate web push subscription",
@@ -2186,7 +2207,9 @@
           "200": {
             "description": "Subscription deactivated"
           }
-        }
+        },
+        "operationId": "deletePushSubscribe",
+        "description": "Deactivate web push subscription"
       }
     },
     "/push/test": {
@@ -2202,7 +2225,9 @@
           "404": {
             "description": "Subscription not found"
           }
-        }
+        },
+        "operationId": "postPushTest",
+        "description": "Send test push to own subscription"
       }
     },
     "/admin/push/stats": {
@@ -2235,7 +2260,8 @@
           "503": {
             "description": "ADMIN_API_TOKEN not configured"
           }
-        }
+        },
+        "operationId": "getAdminPushStats"
       }
     },
     "/admin/push/deliveries": {
@@ -2277,7 +2303,8 @@
           "401": {
             "description": "Invalid or missing admin token"
           }
-        }
+        },
+        "operationId": "getAdminPushDeliveries"
       }
     },
     "/admin/push/test": {
@@ -2318,7 +2345,9 @@
           "503": {
             "description": "VAPID not configured"
           }
-        }
+        },
+        "operationId": "postAdminPushTest",
+        "description": "Send test push to subscription by id (admin)"
       }
     },
     "/admin/push/broadcast": {
@@ -2360,7 +2389,9 @@
           "503": {
             "description": "VAPID not configured"
           }
-        }
+        },
+        "operationId": "postAdminPushBroadcast",
+        "description": "Broadcast push to active subscriptions (admin)"
       }
     }
   },
@@ -2644,13 +2675,15 @@
               "sent": {
                 "type": "array",
                 "items": {
-                  "type": "object"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               },
               "failures": {
                 "type": "array",
                 "items": {
-                  "type": "object"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
@@ -2729,6 +2762,10 @@
         "name": "X-Admin-Token"
       }
     }
+  },
+  "externalDocs": {
+    "description": "Project Documentation",
+    "url": "https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/README.md"
   },
   "tags": [
     {
