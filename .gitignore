@@ -35,6 +35,12 @@ lerna-debug.log*
 # Worktrees and local tooling
 .worktrees/
 
+# Playwright artifacts
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/blob-report/
+tests/e2e/node_modules/
+
 # DB capture temp files (LFS snapshot path data/db-backup/*.sql.gz is tracked)
 data/db-backup/*.partial
 data/db-backup/*.tmp
