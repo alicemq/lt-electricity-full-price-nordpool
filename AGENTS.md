@@ -177,6 +177,17 @@ When executing a revamp phase or adoption slice, agents MUST NOT stop after the 
 
 The scope gate applies to each unit of work; the work loop governs sequencing across units.
 
+### Post-backlog phase
+
+When open revamp issues = 0 (or only operator-blocked, e.g. #34 password rotation):
+
+1. **Run full verification** — `docker compose config -q`, backend tests, frontend build, `./bin/smoke-local.sh`
+2. **Run/add E2E (Playwright)** — today, upcoming, settings, legacy API headers; adapt patterns from `vendor/flows/components/e2e-playwright/` (read-only)
+3. **File new issues** for any failures or gaps found (`source:ai`); never stop silently
+4. **Re-enter work loop** on new issues until the next test gate
+
+E2E lives in `tests/e2e/`; local runner `./bin/run-e2e.sh`; CI workflow `.github/workflows/e2e.yml` (scheduled + `workflow_dispatch`, not a required PR gate until stable).
+
 ## Agent roles
 
 | Role | Owns | Exit criteria |
