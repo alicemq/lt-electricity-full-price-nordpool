@@ -59,7 +59,7 @@ Containerized electricity price monitor with Elering/NordPool sync, multi-countr
 | Database | Production | `docker compose ps`, Postgres on internal network |
 | API v1 | Production | `GET /api/v1/health`, Swagger at `/api/` |
 | Frontend | Vue 3.5 + Vite 7 | `npm run build` in `electricity-prices-build/` |
-| CI | Foundation | `.github/workflows/ci.yml` |
+| CI | Foundation + integration | `.github/workflows/ci.yml`, `.github/workflows/ci-integration.yml` |
 | Deploy | Coolify | `COOLIFY_DEPLOYMENT.md`, `docker-compose.coolify-oneclick.yml` |
 
 **Never trust without verification:** README claims, empty databases, stale docs.
@@ -206,7 +206,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | --- | --- | --- |
 | UA0 | Hygiene, AGENTS.md, gitignore, issue templates | **In progress** (#2) |
 | UA1 | `/ready`, env single source, nginx alignment | Follow-up |
-| UA2 | CI fixture DB, integration tests | Partial (#4) |
+| UA2 | CI fixture DB, integration tests | Done (#4) — `database/fixtures/ci_seed.sql`, golden runner, `ci-integration.yml` |
 | UA3+ | OpenAPI repair, golden tests, sync split, PWA | Planned |
 
 Checklist source: `vendor/flows/examples/nordpool-revamp-checklist.md` (read-only reference).
