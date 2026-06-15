@@ -85,7 +85,9 @@ If you want automatic updates when you push code changes:
 
 ### Step 5: Set Environment Variables
 
-Click on **"Environment Variables"** and add the following:
+Click on **"Environment Variables"** and add the following.
+
+For local development, copy `.env.example` (repo root) and `electricity-prices-build/.env.example`; never commit live values. Production secrets belong in Coolify env vars only.
 
 **REQUIRED Variables** (must be set - no hardcoded defaults in `docker-compose.coolify.yml`):
 

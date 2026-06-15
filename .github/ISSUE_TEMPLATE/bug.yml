@@ -1,0 +1,41 @@
+name: Bug
+description: Something broken or regressed (required before fix unless hotfix)
+title: "[type:bug] "
+labels:
+  - type:bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See **AGENTS.md** scope gate. PRs must reference this issue.
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      description: Who is affected and what they expected.
+      placeholder: "As a ..., I want ..., so that ..."
+    validations:
+      required: true
+  - type: textarea
+    id: dev_story
+    attributes:
+      label: Dev story
+      description: Repro steps, expected vs actual, suspected area, acceptance criteria for the fix.
+      placeholder: |
+        **Repro:**
+        1. …
+        **Expected:** …
+        **Actual:** …
+        **Acceptance criteria:**
+        - [ ] …
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source
+      options:
+        - source:human
+        - source:ai
+    validations:
+      required: true

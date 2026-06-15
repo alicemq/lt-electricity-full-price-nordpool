@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Agent handbook (AGENTS.md)
+    url: https://github.com/alicemq/lt-electricity-full-price-nordpool/blob/main/AGENTS.md
+    about: Scope gate, labels, and workflow before coding
+  - name: flows v0.6.1 templates
+    url: https://github.com/alicemq/flows/tree/v0.6.1/agent-handbook/templates
+    about: CI, issue templates, and revamp checklist source
