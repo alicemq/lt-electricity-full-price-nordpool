@@ -69,7 +69,7 @@ services:
 
   # Swagger UI service for API documentation (internal only)
   swagger-ui:
-    image: swaggerapi/swagger-ui:latest
+    image: swaggerapi/swagger-ui:v5.11.0
     container_name: electricity_swagger_ui
     environment:
       # Swagger UI configurator looks for SWAGGER_JSON_URL to set the default spec URL

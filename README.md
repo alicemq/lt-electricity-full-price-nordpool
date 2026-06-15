@@ -36,6 +36,10 @@ cp .env.example .env.development
 # Start in development mode (exposed services for debugging)
 ./scripts/dev.sh
 
+# Optional: when host ports 3000/5432 are in use, copy and edit local overrides
+# cp docker-compose.dev.local.example docker-compose.dev.local.yml
+# dev.sh auto-includes docker-compose.dev.local.yml when that file exists
+
 # Or manually:
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.development up -d --build
 ```
@@ -55,13 +59,13 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.d
 - **Frontend**: http://localhost:80 (Nginx with API proxy)
 - **Backend**: Internal only (accessed via frontend proxy)
 - **Database**: Internal only
-- **Swagger UI**: http://localhost:80/api/ (API documentation)
+- **Swagger UI**: http://localhost:80/api/ (API documentation; alias `/docs`)
 
 #### **Development Mode**
 - **Frontend**: http://localhost:5173 (Vite dev server)
 - **Backend**: http://localhost:3000 (Express with hot-reload)
 - **Database**: localhost:5432
-- **Swagger UI**: http://localhost:5173/api/ (API documentation)
+- **Swagger UI**: http://localhost:5173/api/ (alias `/docs`)
 
 #### **CapRover Deployment**
 - **Frontend**: https://your-app-name.your-domain.com
@@ -427,8 +431,8 @@ Contributions require DCO sign-off; see [CONTRIBUTING.md](./CONTRIBUTING.md). Ci
 - [Coolify deployment](./COOLIFY_DEPLOYMENT.md) — production deploy guide
 - [Coolify password rotation](./docs/ops/coolify-password-rotation.md) — operator runbook (#34)
 - [Project Planning](./documentation/project_planning.md) - Detailed project documentation
-- [API Documentation](./electricity-prices-build/public/docs/swagger.yaml) - Swagger API specs
-- [Interactive API Docs](./api/) - Swagger UI interface
+- [API Documentation](./swagger-ui/openapi.yaml) - OpenAPI spec (source of truth)
+- [Interactive API Docs](./swagger-ui/README.md) - Swagger UI at `/api/` or `/docs`
 
 ## 🏆 **Migration Success**
 
