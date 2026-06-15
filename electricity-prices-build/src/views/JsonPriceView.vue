@@ -4,16 +4,12 @@ import moment from 'moment-timezone';
 import { fetchPrices } from '../services/priceService';
 import { calculatePrice } from '../services/priceCalculationService';
 import { getPriceClass } from '../utils/priceColor';
+import { getColorThresholdSettings } from '../services/alertSettingsService';
 
 const jsonData = ref(null);
 const isDev = computed(() => import.meta.env.DEV);
 
-const settings = JSON.parse(localStorage.getItem('priceSettings')) || {
-  cheapThreshold: 20,
-  expensiveThreshold: 50,
-  cheapRange: 15,
-  expensiveRange: 15
-};
+const settings = getColorThresholdSettings();
 
 function filterPricesFromNow(prices) {
   const now = moment().unix();
