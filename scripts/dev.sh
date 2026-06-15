@@ -36,6 +36,12 @@ docker-compose "${COMPOSE_FILES[@]}" --env-file "$ENV_FILE" up -d --build
 
 echo "✅ Development environment started!"
 echo ""
+echo "📦 Database data:"
+echo "  Empty volume → historical initial sync (hours) OR restore LFS backup:"
+echo "    ./bin/restore-db-lfs.sh --fresh-volume"
+echo "  Docs: docs/ops/db-backup-lfs.md | CI fixture: database/fixtures/ci_seed.sql"
+echo "  /health may show degraded until Postgres is ready or data exists."
+echo ""
 echo "📱 Services:"
 echo "  Frontend: http://localhost:5173 (Vite dev server)"
 echo "  Backend:  http://localhost:3000 (Express with nodemon)"
