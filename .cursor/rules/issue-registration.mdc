@@ -1,0 +1,37 @@
+---
+description: Register follow-up and out-of-scope work as GitHub issues for separate agents
+alwaysApply: true
+---
+
+# Issue registration
+
+When work is **out of slice scope**, **follow-up**, or **blocked on another track**, agents MUST register a GitHub issue and MUST NOT silently defer or expand the current task.
+
+Canonical procedure: [AGENTS.md](../../AGENTS.md#issue-registration).
+
+## MUST register
+
+- Tech debt or refactor outside current acceptance criteria
+- Bug found in unrelated area during scoped work
+- Generic pattern that belongs in [flows](https://github.com/alicemq/flows/issues) (not product domain)
+- Blocker another agent should own (missing access, cross-repo change)
+- Hotfix skip: open follow-up issue after merge
+
+## MAY fix inline (no new issue)
+
+- Typo in a file already changed in the same PR
+- Lint or gate failure directly caused by your edit
+
+## Procedure
+
+1. **Choose repo** — product issue for product work; flows issue for generic templates, components, or handbook patterns.
+2. **Create issue** — prefer `gh issue create`; use debt template when installed (`agent-handbook/templates/.github/ISSUE_TEMPLATE/debt.yml`).
+3. **Labels** — `source:ai` plus `type:debt`, `type:bug`, `type:feature`, `type:docs`, or `type:security`; add `priority:p0`–`p2` when known.
+4. **Body** — include: user story, dev story (scope, acceptance criteria, out of scope), **Found during:** `#parent` or PR link, **Suggested owner:** Dev | QA | DevOps | security follow-up.
+5. **Report** — add `Debt filed: #N` (or equivalent) in PR description or coordinator synthesis; do not implement unless PO adds to the active slice.
+
+## Anti-patterns
+
+- Expanding scope to "fix while here" without PO approval or a new issue
+- Leaving debt only in chat or comments with no tracker entry
+- One subagent issue bundling multiple unrelated follow-ups

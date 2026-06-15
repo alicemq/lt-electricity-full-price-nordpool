@@ -1,0 +1,20 @@
+# AI Development Instructions — see AGENTS.md for full guide
+
+## Primary reference
+- **AGENTS.md** — roles, scope gate, PR discipline, local smoke
+- **Agent workflow:** docs/plans/agentic-workflow-plan.md
+- **Strategy:** STRATEGY.md
+
+## Stack
+- Document actual stack in AGENTS.md after bootstrap
+- Local verify: `bin/smoke-local.sh` (after UA2 install)
+
+## Documentation
+- OpenAPI: services/api/openapi.yaml (contract source of truth)
+- Progress: PROGRESS_LOG.md
+
+## Non-negotiables
+- Language matching: `.cursor/rules/language-matching.mdc` (from flows install)
+- No issue, no work (scope gate)
+- OpenAPI updated in same PR as HTTP changes
+- UA0 hygiene before feature units
