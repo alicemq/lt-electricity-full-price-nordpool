@@ -1471,46 +1471,102 @@ paths:
   /admin/push/stats:
     get:
       summary: 'Push subscription and delivery stats (admin)'
+      description: 'Active/total subscriptions and 24h send/failure counts. See docs/ops/push-admin.md.'
       tags:
         - Admin
+        - Push
       security:
         - AdminToken: []
       responses:
         '200':
           description: 'Stats payload'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushStatsResponse'
+        '401':
+          description: 'Invalid or missing admin token'
+        '503':
+          description: 'ADMIN_API_TOKEN not configured'
 
   /admin/push/deliveries:
     get:
       summary: 'Recent push deliveries and failures (admin)'
+      description: 'Newest-first delivery log. Query limit 1–200 (default 50).'
       tags:
         - Admin
+        - Push
       security:
         - AdminToken: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
       responses:
         '200':
           description: 'Delivery log'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushDeliveriesResponse'
+        '401':
+          description: 'Invalid or missing admin token'
 
   /admin/push/test:
     post:
       summary: 'Send test push to subscription by id (admin)'
       tags:
         - Admin
+        - Push
       security:
         - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushTestRequest'
       responses:
         '200':
           description: 'Notification sent'
+        '400':
+          description: 'Missing subscriptionId'
+        '404':
+          description: 'Subscription not found'
+        '502':
+          description: 'Delivery failed'
+        '503':
+          description: 'VAPID not configured'
 
   /admin/push/broadcast:
     post:
       summary: 'Broadcast push to active subscriptions (admin)'
       tags:
         - Admin
+        - Push
       security:
         - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushBroadcastRequest'
       responses:
         '200':
           description: 'Broadcast summary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushBroadcastResponse'
+        '400':
+          description: 'Missing title or body'
+        '503':
+          description: 'VAPID not configured'
 
 components:
   schemas:
@@ -1666,6 +1722,94 @@ components:
         code: 'NO_DATA_FOUND'
         timestamp: '2025-06-26T00:15:30.024Z'
         path: '/api/v1/nps/price/lt/latest'
+    PushStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            subscriptions:
+              type: object
+              properties:
+                active:
+                  type: integer
+                  example: 12
+                total:
+                  type: integer
+                  example: 15
+            last24h:
+              type: object
+              properties:
+                sent:
+                  type: integer
+                  example: 48
+                failures:
+                  type: integer
+                  example: 1
+            configured:
+              type: boolean
+              description: 'Whether VAPID keys are set'
+    PushDeliveriesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            sent:
+              type: array
+              items:
+                type: object
+            failures:
+              type: array
+              items:
+                type: object
+    PushTestRequest:
+      type: object
+      required:
+        - subscriptionId
+      properties:
+        subscriptionId:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        url:
+          type: string
+    PushBroadcastRequest:
+      type: object
+      required:
+        - title
+        - body
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        url:
+          type: string
+        activeOnly:
+          type: boolean
+          default: true
+    PushBroadcastResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            targeted:
+              type: integer
+            sent:
+              type: integer
+            failed:
+              type: integer
   securitySchemes:
     AdminToken:
       type: apiKey
@@ -1684,5 +1828,7 @@ tags:
     description: 'Sync worker status and admin triggers'
   - name: Admin
     description: 'Protected admin API (ADMIN_API_TOKEN)'
+  - name: Push
+    description: 'Web push subscriptions and admin delivery (see docs/ops/push-admin.md)'
   - name: Legacy
     description: 'Deprecated compatibility endpoints; prefer /nps/* equivalents'
