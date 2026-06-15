@@ -2,12 +2,12 @@
 
 **Read this first.** This repo tracks Baltic NordPool electricity prices (LT, EE, LV, FI) via a Vue 3 frontend, Express API, and PostgreSQL.
 
-## Cornerstone: flows v0.6.0
+## Cornerstone: flows v0.6.1
 
-Agent workflow patterns come from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.0**. Install or refresh templates:
+Agent workflow patterns come from [alicemq/flows](https://github.com/alicemq/flows) **v0.6.1**. Install or refresh templates:
 
 ```bash
-git clone --depth 1 --branch v0.6.0 https://github.com/alicemq/flows.git /tmp/flows
+git clone --depth 1 --branch v0.6.1 https://github.com/alicemq/flows.git /tmp/flows
 /tmp/flows/install.sh --target . --phase ua0 --project-name nordpool
 ```
 
