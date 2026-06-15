@@ -18,6 +18,9 @@ A modern, containerized electricity price monitoring system for Baltic countries
 git clone <repository-url>
 cd LT-electricity-full-price-NordPool
 
+# First run: copy .env.example to .env.production and set POSTGRES_PASSWORD (or use ./scripts/prod.sh)
+cp .env.example .env.production
+
 # Start in production mode (secure architecture)
 ./scripts/prod.sh
 
@@ -27,6 +30,9 @@ docker-compose --env-file .env.production up -d --build
 
 #### **Development Mode**
 ```bash
+# First run: copy .env.example to .env.development (or use ./scripts/dev.sh)
+cp .env.example .env.development
+
 # Start in development mode (exposed services for debugging)
 ./scripts/dev.sh
 

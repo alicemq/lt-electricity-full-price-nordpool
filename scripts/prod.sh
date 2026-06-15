@@ -3,11 +3,16 @@
 # Production startup script
 echo "🚀 Starting Electricity Prices in Production Mode..."
 
-# Copy production environment
-cp .env.production .env
+# Local env files are gitignored — seed from .env.example on first run
+ENV_FILE=".env.production"
+if [ ! -f "$ENV_FILE" ]; then
+  cp .env.example "$ENV_FILE"
+  echo "Created $ENV_FILE from .env.example — set strong POSTGRES_PASSWORD before production use."
+fi
+cp "$ENV_FILE" .env
 
 # Build and start services
-docker-compose --env-file .env.production up -d --build
+docker-compose --env-file "$ENV_FILE" up -d --build
 
 echo "✅ Production environment started!"
 echo ""

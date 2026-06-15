@@ -115,7 +115,7 @@ When you find a defect, missing test, doc drift, or scope gap during work and yo
 ## Secrets policy
 
 - **Never commit** `.env`, passwords, or API keys. Use `.env.example` and `deploy/local.env.example` with `CHANGE_ME` placeholders.
-- Tracked `.env.development` / `.env.production` remain in git history until a dedicated untrack PR (issue #3); new local files MUST use gitignored copies.
+- Live `.env`, `.env.development`, and `.env.production` are gitignored; copy from `.env.example` locally (`./scripts/dev.sh` and `./scripts/prod.sh` seed on first run).
 - Production secrets belong in Coolify env vars, not YAML in the repo.
 
 ## Local verification
