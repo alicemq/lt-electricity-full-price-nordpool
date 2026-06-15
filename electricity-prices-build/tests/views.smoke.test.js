@@ -34,6 +34,7 @@ vi.mock('vue-router', () => ({
     },
     path: '/today',
     fullPath: '/today',
+    query: {},
   }),
 }));
 
