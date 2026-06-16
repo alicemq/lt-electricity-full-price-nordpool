@@ -10,7 +10,7 @@ import {
   isDaySynced,
   clearDaySync,
 } from '../utils/deviceSyncState';
-import { filterUpcomingSlots } from './timeService';
+import { filterUpcomingSlots, isCurrentOrFutureSlot } from './timeService';
 
 const CACHE_KEY = 'priceDataCache';
 const CACHE_VERSION = 1;
@@ -243,16 +243,19 @@ export function getDaysNeedingSync(country = 'lt', now = moment()) {
  */
 function cleanOldData() {
   const cache = getCache();
-  const cutoff = moment().tz('Europe/Vilnius').subtract(DAYS_TO_KEEP, 'days').startOf('day').unix();
-  const now = moment().tz('Europe/Vilnius').unix();
-  
-  Object.keys(cache.data).forEach(countryKey => {
-    cache.data[countryKey] = cache.data[countryKey].filter(price => {
-      // Keep if it's within the last 7 days OR it's in the future
-      return price.timestamp >= cutoff || price.timestamp >= now;
+  const now = moment().tz(DISPLAY_TIMEZONE);
+  const cutoff = now.clone().subtract(DAYS_TO_KEEP, 'days').startOf('day').unix();
+
+  Object.keys(cache.data).forEach((countryKey) => {
+    const countryData = cache.data[countryKey];
+    const intervalSeconds = inferMtuIntervalSeconds(countryData);
+    cache.data[countryKey] = countryData.filter((price) => {
+      // Keep if it's within the last 7 days OR it's the active/future MTU
+      return price.timestamp >= cutoff
+        || isCurrentOrFutureSlot(price.timestamp, intervalSeconds, now);
     });
   });
-  
+
   saveCache(cache);
 }
 
@@ -301,13 +304,13 @@ export function getCacheStats() {
  */
 export function detectFutureGaps(country = 'lt', now = moment()) {
   const nowVilnius = now.clone().tz(DISPLAY_TIMEZONE);
-  const nowTs = nowVilnius.unix();
   const phase = getReleasePhase(now);
   const tomorrowStr = getTargetReleaseDay(now);
   const todayStr = nowVilnius.format('YYYY-MM-DD');
 
   const countryData = getCache().data[country.toLowerCase()] || [];
-  const futureData = countryData.filter((p) => p.timestamp >= nowTs);
+  const intervalSeconds = inferMtuIntervalSeconds(countryData);
+  const futureData = filterUpcomingSlots(countryData, intervalSeconds, now);
 
   const todayValidation = validateDayCompleteness(todayStr, country);
   const tomorrowValidation = validateDayCompleteness(tomorrowStr, country);
