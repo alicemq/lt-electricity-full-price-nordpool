@@ -1,5 +1,11 @@
 # Progress Log
 
+## [2026-06-16] UA4 golden DST/MTU harness (#151)
+
+- Added `tests/golden/prices.json` with normal hourly, DST spring/fall, and 15-min MTU cases.
+- Extended `database/fixtures/ci_seed.sql` for 2025-10-26 (25h) and 2025-06-15 (96×15-min).
+- Golden runner validates `prices.json` meta and first-slot price alongside HTTP scenarios.
+
 ## [2026-06-16] E2E frontend-only mode (#152)
 
 - `bin/run-e2e.sh`: `--frontend-only` / `--with-stack`, `--print-config`, `--help`.

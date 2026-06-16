@@ -34,6 +34,24 @@
     "expectDataFirstPrice": 45.5
   },
   {
+    "id": "G6-prices-dst-fall",
+    "description": "Prices for 2025-10-26 DST fall-back day return 25 hourly MTUs",
+    "method": "GET",
+    "path": "/api/v1/nps/prices?date=2025-10-26&country=lt",
+    "expectStatus": 200,
+    "expectBody": { "success": true },
+    "expectMeta": { "count": 25, "timezone": "Europe/Vilnius", "intervalSeconds": 3600 }
+  },
+  {
+    "id": "G7-prices-fifteen-min",
+    "description": "Prices for 2025-06-15 return 96 fifteen-minute MTUs",
+    "method": "GET",
+    "path": "/api/v1/nps/prices?date=2025-06-15&country=lt",
+    "expectStatus": 200,
+    "expectBody": { "success": true },
+    "expectMeta": { "count": 96, "timezone": "Europe/Vilnius", "intervalSeconds": 900 }
+  },
+  {
     "id": "G5-ready",
     "description": "Readiness on CI fixture: postgres up, historical seed → not_ready 503",
     "method": "GET",
