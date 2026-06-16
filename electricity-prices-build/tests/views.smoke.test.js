@@ -129,6 +129,31 @@ describe('TodayView smoke', () => {
     expect(wrapper.find('.date-picker-stub').element.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(wrapper.find('[data-empty="true"]').exists()).toBe(true);
   });
+
+  it('shows API unavailable message when fetch fails with network error', async () => {
+    const { fetchPrices } = await import('../src/services/priceService.js');
+    fetchPrices.mockRejectedValueOnce(Object.assign(new Error('Network Error'), { response: undefined }));
+
+    const TodayView = (await import('../src/views/TodayView.vue')).default;
+    const wrapper = mount(TodayView, {
+      global: {
+        stubs: {
+          VueDatePicker: {
+            template: '<input class="date-picker-stub" :value="modelValue" readonly />',
+            props: ['modelValue'],
+          },
+          PriceTable: true,
+        },
+        mocks: { $t: (key) => key },
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(wrapper.find('.alert-danger').exists()).toBe(true);
+    expect(wrapper.text()).toContain('today.apiUnavailable');
+    expect(wrapper.find('.alert-warning').exists()).toBe(false);
+  });
 });
 
 describe('UpcomingPricesView smoke', () => {

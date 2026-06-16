@@ -73,6 +73,7 @@ const priceData = ref([]);
 const isLoading = ref(true);
 
 const error = ref(null);
+const errorKind = ref(null);
 
 
 
@@ -159,11 +160,13 @@ async function reloadPrices() {
     try {
       isLoading.value = true;
       error.value = null;
+      errorKind.value = null;
       const data = await fetchPrices(selectedDateAsDate());
       priceData.value = data.data?.lt || [];
       await nextTick();
       logAllPriceBreakdowns();
     } catch (err) {
+      errorKind.value = err?.response ? 'load' : 'network';
       error.value = err?.message || 'Failed to load prices';
       priceData.value = [];
     } finally {
@@ -345,7 +348,7 @@ function setTomorrow() {
 
       <div v-else-if="error" class="alert alert-danger">
 
-        {{ $t('upcoming.error') }}
+        {{ $t(errorKind === 'network' ? 'today.apiUnavailable' : 'upcoming.error') }}
 
       </div>
 
