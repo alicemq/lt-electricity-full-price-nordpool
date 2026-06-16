@@ -6,7 +6,8 @@ Nordpool uses a layered test pyramid. Golden acceptance tests live in `tests/gol
 
 | Path | Purpose |
 | --- | --- |
-| `tests/golden/scenarios.json` | Domain acceptance cases (price dates, DST counts) |
+| `tests/golden/scenarios.json` | HTTP acceptance cases (health, ready, smoke paths) |
+| `tests/golden/prices.json` | Product golden price cases (DST + MTU counts, first price) |
 | `tests/golden/runner.test.js` | HTTP runner with `INTEGRATION_TESTS` gate |
 | `database/fixtures/ci_seed.sql` | Postgres fixture for CI integration job |
 | `electricity-prices-build/tests/views.smoke.test.js` | Today + Upcoming render with mocked API |

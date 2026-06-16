@@ -99,7 +99,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | **UA1** | `/ready`, env single source, nginx alignment | **Done** | #116, #117 closed |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
 | **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Done** | #101 closed (#146, #147); Express embed deferred per [swagger-ui-delivery.md](decisions/swagger-ui-delivery.md) |
-| **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
+| **UA4** | Golden price / DST / MTU harness | **Done** | #151; `tests/golden/prices.json`, extended `ci_seed.sql` |
 | **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision (§5) |
 | **UA6** | Post-deploy smoke, Coolify runbook | **Done** | #118; [docs/ops/post-deploy-verification.md](ops/post-deploy-verification.md) |
 | **UA7–UA8** | PWA shell, client storage tiers | **Planned** | Not installed |

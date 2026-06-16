@@ -319,7 +319,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | UA1 | `/ready`, env single source, nginx alignment | **Done** (#116, #117) |
 | UA2 | CI fixture DB, integration tests | **Done** (#4) — `database/fixtures/ci_seed.sql`, golden runner, `ci-integration.yml` |
 | UA3 | OpenAPI repair, Spectral, `/docs` UX | **Done** (#101; #146, #147) |
-| UA4 | Golden price / DST / MTU harness | **Planned** — next default slice |
+| UA4 | Golden price / DST / MTU harness | **Done** (#151) |
 | UA5 | Split `syncWorker.js`, advisory lock | **Planned** — blocked on worker architecture (§5) |
 | UA6 | Post-deploy smoke, Coolify runbook | **Done** (#118) |
 | UA7–UA8 | PWA shell, client storage tiers | **Planned** |

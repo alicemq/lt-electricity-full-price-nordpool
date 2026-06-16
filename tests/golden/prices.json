@@ -1,0 +1,42 @@
+[
+  {
+    "id": "P1-normal-hourly",
+    "description": "Normal summer day: 24 hourly MTUs at 60-min interval",
+    "date": "2024-06-15",
+    "country": "lt",
+    "expectCount": 24,
+    "expectIntervalSeconds": 3600,
+    "expectFirstPrice": 45.5,
+    "expectTimezone": "Europe/Vilnius"
+  },
+  {
+    "id": "P2-dst-spring-hourly",
+    "description": "DST spring-forward day: 23 hourly MTUs (clock skips 03:00)",
+    "date": "2025-03-30",
+    "country": "lt",
+    "expectCount": 23,
+    "expectIntervalSeconds": 3600,
+    "expectFirstPrice": 52.25,
+    "expectTimezone": "Europe/Vilnius"
+  },
+  {
+    "id": "P3-dst-fall-hourly",
+    "description": "DST fall-back day: 25 hourly MTUs (repeated 03:00 hour)",
+    "date": "2025-10-26",
+    "country": "lt",
+    "expectCount": 25,
+    "expectIntervalSeconds": 3600,
+    "expectFirstPrice": 48.75,
+    "expectTimezone": "Europe/Vilnius"
+  },
+  {
+    "id": "P4-fifteen-min-mtu",
+    "description": "15-min MTU normal day: 96 quarter-hour slots",
+    "date": "2025-06-15",
+    "country": "lt",
+    "expectCount": 96,
+    "expectIntervalSeconds": 900,
+    "expectFirstPrice": 15.25,
+    "expectTimezone": "Europe/Vilnius"
+  }
+]
