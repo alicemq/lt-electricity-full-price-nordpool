@@ -98,7 +98,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Mostly done**; v0.7.1 cursor rules pending | #2 closed; **#115 open** |
 | **UA1** | `/ready`, env single source, nginx alignment | **Done** | `/ready` #116; env SSOT #117 |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
-| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Mostly done** | #101 open — contract sample expansion; optional Express embed deferred |
+| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Done** | #101 — public-path contract samples; Express embed deferred per [swagger-ui-delivery.md](decisions/swagger-ui-delivery.md) |
 | **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
 | **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision |
 | **UA6** | Post-deploy smoke, Coolify runbook | **Done** | #118; [docs/ops/post-deploy-verification.md](ops/post-deploy-verification.md) |
@@ -113,7 +113,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | Deploy target | **Coolify** (Docker Compose) | Runbook: [COOLIFY_DEPLOYMENT.md](../COOLIFY_DEPLOYMENT.md) |
 | API layout | **legacy-api-backend** (`backend/`, inline worker) | Matches existing compose; flows `--layout legacy-api-backend` |
 | Frontend path | `electricity-prices-build/` | Historical; flows templates use `--frontend-dir` |
-| OpenAPI location | `swagger-ui/openapi.yaml` | Single source pending UA3 consolidation of duplicates |
+| OpenAPI location | `swagger-ui/openapi.yaml` | Single source of truth; `openapi.json` generated in CI |
 | CI integration | Fixture DB + golden runner | UA2 exit met (#4) |
 | Fresh DB onboarding | LFS restore **or** wait for initial sync | Documented in README; #106 closed via #121 |
 | E2E gate | Scheduled + `workflow_dispatch`; not required on PR | Until suite stable |
@@ -218,7 +218,7 @@ Ordered by revamp dependency and PO impact. Live tracker: https://github.com/ali
 | --- | --- |
 | **#115** | Adopt flows v0.7.1 agent infra (cursor rules, debt template, PROGRESS_LOG) — **prerequisite for consistent autonomous shipping** |
 | **#116** | Define and implement `/ready` SLO (depends on §5 row 3) |
-| **#101** | Complete UA3 OpenAPI contract hygiene (Spectral full ruleset blocked by #122) |
+| **#101** | UA3 OpenAPI contract hygiene — **done** (public-path samples, PR gate docs; Express embed deferred) |
 
 ### P2 — Operational reliability and env consistency
 

@@ -74,6 +74,59 @@ describe('live API contract samples', { skip: !LIVE }, () => {
     assert.equal(body.meta.timezone, 'Europe/Vilnius');
     assert.ok(body.data.lt[0].price > 0);
   });
+
+  it('GET /api/v1/countries returns countries with fixture data', async () => {
+    const res = await fetch(`${API_URL}/api/v1/countries`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(body.data.length >= 1);
+    const codes = body.data.map((c) => c.code);
+    assert.ok(codes.includes('lt'), 'CI fixture seeds lt price rows');
+    for (const entry of body.data) {
+      assert.equal(typeof entry.code, 'string');
+      assert.equal(typeof entry.name, 'string');
+    }
+  });
+
+  it('GET /api/v1/sync/status returns worker state', async () => {
+    const res = await fetch(`${API_URL}/api/v1/sync/status`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(typeof body.data.isRunning, 'boolean');
+    assert.ok(Array.isArray(body.data.scheduledJobs));
+    if ('syncInProgress' in body.data) {
+      assert.equal(typeof body.data.syncInProgress, 'boolean');
+    }
+  });
+
+  it('GET /api/v1/nps/price/lt/latest returns seeded price', async () => {
+    const res = await fetch(`${API_URL}/api/v1/nps/price/lt/latest`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(Array.isArray(body.data));
+    assert.ok(body.data.length >= 1);
+    assert.ok(body.data[0].price > 0);
+    assert.equal(body.meta.timezone, 'Europe/Vilnius');
+  });
+
+  it('GET /api/v1/configurations returns tariff data', async () => {
+    const res = await fetch(`${API_URL}/api/v1/configurations`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(body.data);
+    assert.ok(body.meta);
+  });
+
+  it('GET /api/v1/push/status returns configured flag', async () => {
+    const res = await fetch(`${API_URL}/api/v1/push/status`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.equal(typeof body.configured, 'boolean');
+  });
 });
 
 if (!LIVE) {

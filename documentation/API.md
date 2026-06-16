@@ -6,7 +6,9 @@ The Electricity Prices NordPool API provides access to electricity price data fo
 
 **OpenAPI source of truth:** `swagger-ui/openapi.yaml` (JSON generated in CI). Interactive docs: `/api/` via the frontend proxy (`/docs` redirects to `/api/` in nginx and Vite dev).
 
-**Contract lint:** CI runs Spectral `spectral:oas` against `swagger-ui/openapi.yaml` (see `.spectral.yaml`). Structure samples: `tests/contract/openapi-samples.test.js`; live response shapes: `tests/contract/live-api-samples.test.js` (integration CI with `CONTRACT_FIXTURE=1`).
+**Contract lint:** CI runs Spectral `spectral:oas` against `swagger-ui/openapi.yaml` (see `.spectral.yaml`). Structure samples: `tests/contract/openapi-samples.test.js` (every public path in `tests/contract/public-paths.js`); live response shapes: `tests/contract/live-api-samples.test.js` (integration CI with `CONTRACT_FIXTURE=1`).
+
+**Contract PR gate:** Every PR runs OpenAPI structure samples, JSON sync, route parity, and Spectral in `.github/workflows/ci.yml` (`lint-and-unit`). Live contract samples run in `.github/workflows/ci-integration.yml` when backend or contract tests change. See [docs/checklists/ua-testing.md](../docs/checklists/ua-testing.md#contract-pr-gate-ua3).
 
 **Legacy compatibility:** Unversioned `/api/*` paths forward to `/api/v1/*` with deprecation headers. See [legacy-api.md](./legacy-api.md).
 

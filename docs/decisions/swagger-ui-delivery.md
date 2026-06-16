@@ -24,8 +24,8 @@ Keep the **dedicated `swagger-ui` Docker service** (pinned `swaggerapi/swagger-u
 
 ## Out of scope (follow-up)
 
-- Consolidating duplicate OpenAPI copies under `documentation/` (UA3 #101)
 - Optional Express redirect-only `/docs` route (not needed while nginx/Vite handle aliases)
+- Full JSON response schemas on push and sync POST operations (#122 Spectral follow-up)
 
 ## Verification
 
