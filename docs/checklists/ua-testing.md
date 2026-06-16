@@ -31,8 +31,8 @@ Use after UA2 (CI scaffold green). Aligns with [agentic-workflow-plan.md](../pla
 ## L4 — Boot smoke (local + post-deploy)
 
 - [x] `bin/smoke-local.sh`: compose lint, file asserts, optional live `/health`
-- [ ] `bin/post-deploy-smoke.sh`: `/ready` + one golden scenario (#118)
-- [ ] URLs from single env source (#117)
+- [x] `bin/post-deploy-smoke.sh`: `/ready` + one golden scenario (#118)
+- [x] URLs from single env source (#117)
 
 ## L5 — E2E UI (scheduled + local)
 

@@ -6,12 +6,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-if [[ -f deploy/local.env ]]; then
-  # shellcheck disable=SC1091
-  set -a
-  source deploy/local.env
-  set +a
-fi
+# shellcheck source=load-env.sh
+source "${ROOT}/bin/load-env.sh"
 
 POSTGRES_DB="${POSTGRES_DB:-electricity_prices}"
 POSTGRES_USER="${POSTGRES_USER:-electricity_user}"
