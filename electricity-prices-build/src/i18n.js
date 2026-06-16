@@ -13,6 +13,9 @@ const messages = {
       today: 'Today',
       tomorrow: 'Tomorrow'
     },
+    today: {
+      apiUnavailable: 'Cannot load prices — the API is unavailable. Start the backend stack (docker compose up) and try again.',
+    },
     display: {
       invalidTitle: 'Invalid display link',
       invalidBody: 'This shared layout link is missing or could not be decoded. Ask the sender for a new link.',
@@ -157,6 +160,9 @@ const messages = {
       title: 'Elektros kainos',
       today: 'Šiandien',
       tomorrow: 'Rytoj'
+    },
+    today: {
+      apiUnavailable: 'Nepavyko įkelti kainų — API nepasiekiamas. Paleiskite backend (docker compose up) ir bandykite dar kartą.',
     },
     display: {
       invalidTitle: 'Netinkama rodinio nuoroda',

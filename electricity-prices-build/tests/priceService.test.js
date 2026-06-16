@@ -110,4 +110,14 @@ describe('fetchPrices historical dates', () => {
     expect(result.meta.skippedNetwork).toBe(true);
     expect(result.data.lt).toEqual([]);
   });
+
+  it('throws on network error when historical cache is incomplete', async () => {
+    seedCache(buildHourlyDay('2026-06-14', 2));
+    axios.get.mockRejectedValueOnce(new Error('Network Error'));
+
+    const { fetchPrices } = await import('../src/services/priceService.js');
+    const date = moment.tz('2026-06-14', DISPLAY_TIMEZONE).startOf('day').toDate();
+
+    await expect(fetchPrices(date, 'lt')).rejects.toThrow('Network Error');
+  });
 });

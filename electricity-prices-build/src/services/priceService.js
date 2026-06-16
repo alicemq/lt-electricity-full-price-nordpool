@@ -124,11 +124,14 @@ export async function fetchPrices(date, country = 'lt', options = {}) {
   } catch (error) {
     console.error('Error fetching prices:', error);
     if (cached && cached.length > 0) {
-      console.log('[Cache] Using cached data as fallback for date', formattedDate);
-      return buildCachedResponse(cached, country, {
-        date: formattedDate,
-        offline: true,
-      });
+      const validation = validateDayCompleteness(formattedDate, country);
+      if (validation.isComplete) {
+        console.log('[Cache] Using complete cached data as fallback for date', formattedDate);
+        return buildCachedResponse(cached, country, {
+          date: formattedDate,
+          offline: true,
+        });
+      }
     }
     throw error;
   }
