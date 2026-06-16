@@ -96,12 +96,12 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | --- | --- | --- | --- |
 | **Blockers** | Human decisions before feature work | **Partially open** | See §5 |
 | **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Mostly done**; v0.7.1 cursor rules pending | #2 closed; **#115 open** |
-| **UA1** | `/ready`, env single source, nginx alignment | **Partial** | `/health` exists; **#116**, **#117** |
+| **UA1** | `/ready`, env single source, nginx alignment | **Done** | `/ready` #116; env SSOT #117 |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
 | **UA3** | OpenAPI repair, Spectral, `/docs` UX | **In progress** | #101; Spectral `spectral:oas` (#128); live contract CI (#136); **#122** closed |
 | **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
 | **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision |
-| **UA6** | Post-deploy smoke, Coolify runbook | **Planned** | **#118** |
+| **UA6** | Post-deploy smoke, Coolify runbook | **Done** | #118; [docs/ops/post-deploy-verification.md](ops/post-deploy-verification.md) |
 | **UA7–UA8** | PWA shell, client storage tiers | **Planned** | Not installed |
 | **UA9** | Push scaffold | **Optional** | Not started |
 | **UA10** | Debt register, checklists, adoption log | **In progress** | **#119**; register + `ua-testing` checklist landed; `PROGRESS_LOG.md` active |
@@ -139,8 +139,8 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | `debt.yml` issue template | #115 |
 | `STRATEGY.md`, `PROGRESS_LOG.md` | #115, #119 |
 | `GET /ready` + freshness SLO | **Done** — [docs/ops/ready-slo.md](ops/ready-slo.md); #116 closed |
-| `load-env.sh` / `compose.sh` single source | #117 |
-| `post-deploy-smoke.sh`, `bulletproof.sh` | #118 (depends on `/ready`) |
+| `load-env.sh` / `compose.sh` single source | **Done** — #117; [PROJECT-GUIDANCE.md](PROJECT-GUIDANCE.md) |
+| `post-deploy-smoke.sh`, `bulletproof.sh` | **Done** — #118 |
 | `review-debt-register.md`, ua checklists | #119 |
 | Full `spectral:oas` ruleset | Spectral crash; #122 |
 | Worker split + advisory lock | PO decision §5; UA5 |

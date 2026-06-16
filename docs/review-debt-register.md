@@ -6,8 +6,8 @@ Index of known tech debt, bugs, and follow-ups. Link GitHub issues; do not dupli
 | --- | --- | --- | --- | --- |
 | UA3 | [#101](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/101) OpenAPI contract hygiene, Spectral, `/docs` UX | P1 | API / docs | Open |
 | UA3 | [#136](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/136) Live API contract samples in CI | P1 | CI / contract | In progress |
-| UA1 | [#117](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/117) Env single source (`load-env.sh`, `compose.sh`) | P2 | DevOps | Open |
-| UA6 | [#118](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/118) Post-deploy smoke + bulletproof scripts | P2 | CI / ops | Open |
+| UA1 | [#117](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/117) Env single source (`load-env.sh`, `compose.sh`) | P2 | DevOps | Closed via #138 + env SSOT PR |
+| UA6 | [#118](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/118) Post-deploy smoke + bulletproof scripts | P2 | CI / ops | Closed via #138 |
 | UA10 | [#119](https://github.com/alicemq/lt-electricity-full-price-nordpool/issues/119) Debt register, UA checklists, adoption log | P2 | Docs | In progress |
 
 ## Blockers (PO decisions)
