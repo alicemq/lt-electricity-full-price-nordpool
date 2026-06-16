@@ -42,7 +42,13 @@ See [ready-slo.md](./ready-slo.md) for the readiness SLO.
 ## Live contract samples
 
 ```bash
+# Production or dev stack with live sync data
 CONTRACT_LIVE=1 API_URL=http://127.0.0.1:3000 node --test tests/contract/live-api-samples.test.js
+
+# CI fixture DB (historical seed → /ready not_ready)
+CONTRACT_LIVE=1 CONTRACT_FIXTURE=1 API_URL=http://127.0.0.1:3001 node --test tests/contract/live-api-samples.test.js
 ```
 
 OpenAPI structure samples (no running API) run in CI via `tests/contract/openapi-samples.test.js`.
+
+Swagger UI delivery decision: [docs/decisions/swagger-ui-delivery.md](../decisions/swagger-ui-delivery.md).

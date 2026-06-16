@@ -1,5 +1,12 @@
 # Progress Log
 
+## [2026-06-16] UA3 live contract CI + UA10 debt register (#136, #119)
+
+- Wired `tests/contract/live-api-samples.test.js` into `ci-integration.yml` with `CONTRACT_FIXTURE=1`.
+- Recorded Swagger UI delivery decision: dedicated container, not Express embed (`docs/decisions/swagger-ui-delivery.md`).
+- Populated `docs/review-debt-register.md`; added `docs/checklists/ua-testing.md`.
+- Verified upcoming 03:45 slot at frozen 03:48: Vitest + Playwright E2E green on main.
+
 ## [2026-06-16] flows v0.7.1 agent infra (#115)
 
 - Pinned `vendor/flows` at `bc16808` (`v0.7.1`).
