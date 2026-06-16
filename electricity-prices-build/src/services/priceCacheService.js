@@ -10,6 +10,7 @@ import {
   isDaySynced,
   clearDaySync,
 } from '../utils/deviceSyncState';
+import { filterUpcomingSlots } from './timeService';
 
 const CACHE_KEY = 'priceDataCache';
 const CACHE_VERSION = 1;
@@ -87,10 +88,10 @@ export function getCachedUpcomingPrices(country = 'lt') {
   
   if (countryData.length === 0) return null;
   
-  const now = moment().tz('Europe/Vilnius').unix();
-  const filtered = countryData.filter(price => price.timestamp >= now);
-  
-  return filtered.length > 0 ? filtered.sort((a, b) => a.timestamp - b.timestamp) : null;
+  const intervalSeconds = inferMtuIntervalSeconds(countryData);
+  const filtered = filterUpcomingSlots(countryData, intervalSeconds);
+
+  return filtered.length > 0 ? filtered : null;
 }
 
 /**
