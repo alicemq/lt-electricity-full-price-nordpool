@@ -23,7 +23,7 @@ fi
 API_URL="${API_URL:-${LOCAL_API_URL:-http://127.0.0.1:3000}}"
 if curl -sf "${API_URL}/health" >/dev/null 2>&1 && [[ -f bin/run-e2e.sh ]]; then
   echo "==> Playwright E2E (${FRONTEND_URL:-${LOCAL_FRONTEND_URL}})"
-  SKIP_WEB_SERVER=1 FRONTEND_URL="${FRONTEND_URL:-${LOCAL_FRONTEND_URL}}" bash bin/run-e2e.sh
+  FRONTEND_URL="${FRONTEND_URL:-${LOCAL_FRONTEND_URL}}" bash bin/run-e2e.sh --with-stack
 else
   echo "SKIP: Playwright E2E (API not running at ${API_URL} or bin/run-e2e.sh missing)"
 fi
