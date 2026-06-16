@@ -5,16 +5,12 @@ import { fetchPrices } from '../services/priceService';
 import { calculatePrice } from '../services/priceCalculationService';
 import { getPriceClass } from '../utils/priceColor';
 import { getColorThresholdSettings } from '../services/alertSettingsService';
+import { filterUpcomingSlots } from '../services/timeService';
 
 const jsonData = ref(null);
 const isDev = computed(() => import.meta.env.DEV);
 
 const settings = getColorThresholdSettings();
-
-function filterPricesFromNow(prices) {
-  const now = moment().unix();
-  return prices.filter(price => price.timestamp >= now);
-}
 
 let refreshTimeout = null;
 
@@ -42,7 +38,7 @@ async function loadAndProcessPrices() {
       fetchPrices(moment().add(1, 'days').toDate())
     ]);
 
-    const todayPrices = filterPricesFromNow(todayData.data?.lt || []);
+    const todayPrices = filterUpcomingSlots(todayData.data?.lt || []);
     const tomorrowPrices = tomorrowData.data?.lt || [];
 
     const allPrices = [...todayPrices, ...tomorrowPrices];

@@ -3,15 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import moment from 'moment-timezone';
 import { fetchPrices } from '../services/priceService';
 import { calculatePrice } from '../services/priceCalculationService';
+import { filterUpcomingSlots } from '../services/timeService';
 
 const jsonData = ref(null);
 
 let refreshTimeout = null;
-
-function filterFuturePrices(prices) {
-  const now = moment().unix();
-  return prices.filter(price => price.timestamp >= now);
-}
 
 function scheduleNextRefresh() {
   if (refreshTimeout) clearTimeout(refreshTimeout);
@@ -37,7 +33,7 @@ async function loadAndProcessPrices() {
       fetchPrices(moment().add(1, 'days').toDate())
     ]);
 
-    const todayPrices = filterFuturePrices(todayData.data?.lt || []);
+    const todayPrices = filterUpcomingSlots(todayData.data?.lt || []);
     const tomorrowPrices = tomorrowData.data?.lt || [];
 
     const processPrice = price => ({
