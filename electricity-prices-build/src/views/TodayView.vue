@@ -349,7 +349,7 @@ function setTomorrow() {
 
       </div>
 
-      <PriceTable v-else :priceData="priceData" />
+      <PriceTable v-else :priceData="priceData" :selectedDate="selectedDate" />
 
     </div>
 

@@ -3,7 +3,9 @@ import moment from 'moment-timezone';
 import {
   shouldFetchFutureData,
   isCurrentDisplayDay,
+  isHistoricalDate,
   getTargetReleaseDay,
+  toDisplayDayMoment,
   DISPLAY_TIMEZONE,
 } from '../src/utils/releaseWindow.js';
 
@@ -30,5 +32,11 @@ describe('shouldFetchFutureData', () => {
     const dayAfterTomorrow = now.clone().add(2, 'day').startOf('day').toDate();
 
     expect(shouldFetchFutureData(dayAfterTomorrow, now)).toBe(false);
+  });
+
+  it('parses YYYY-MM-DD strings in Vilnius timezone', () => {
+    const day = toDisplayDayMoment('2026-06-14');
+    expect(day.format('YYYY-MM-DD HH:mm:ss Z')).toBe('2026-06-14 00:00:00 +03:00');
+    expect(isHistoricalDate('2026-06-14', moment.tz('2026-06-16', DISPLAY_TIMEZONE))).toBe(true);
   });
 });

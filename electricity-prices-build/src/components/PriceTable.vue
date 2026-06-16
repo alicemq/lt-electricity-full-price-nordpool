@@ -5,6 +5,7 @@ import { formatPriceHours, isCurrentHour } from '../services/timeService';
 import { calculatePrice, getTimePeriod } from '../services/priceCalculationService';
 import { getPriceClass } from '../utils/priceColor';
 import { getColorThresholdSettings } from '../services/alertSettingsService';
+import { isHistoricalDate } from '../utils/releaseWindow';
 
 const props = defineProps({
   priceData: {
@@ -16,10 +17,22 @@ const props = defineProps({
     type: Array,
     required: false,
     default: null // Will use priceData if not provided
-  }
+  },
+  selectedDate: {
+    type: String,
+    required: false,
+    default: null,
+  },
 })
 
 const hasEnoughData = computed(() => props.priceData && props.priceData.length >= 3)
+
+const emptyStateMessageKey = computed(() => {
+  if (props.selectedDate && isHistoricalDate(props.selectedDate)) {
+    return 'table.noDataHistorical';
+  }
+  return 'table.noData';
+});
 
 const intervalSeconds = computed(() => {
   if (props.priceData && props.priceData.length >= 2) {
@@ -209,7 +222,7 @@ const groupedByHour = computed(() => {
 
 <template>
   <div v-if="!hasEnoughData" class="alert alert-warning" role="alert">
-    <span v-html="$t('table.noData').replace('\n', '<br>')"></span>
+    <span v-html="$t(emptyStateMessageKey).replace('\n', '<br>')"></span>
   </div>
   <div v-else class="table-responsive">
     <table class="table table-hover align-middle">

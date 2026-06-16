@@ -95,6 +95,7 @@ const messages = {
     },
     table: {
       noData: 'Price data is not yet available for selected date.\nData is typically available after 15:00 local time (13:00 UTC).',
+      noDataHistorical: 'No price data is available for this date in our database.',
       intervalHeader: 'Interval',
       priceHeader: 'Price ct/kWh',
       hourHeader: 'Prices in cents',
@@ -239,6 +240,7 @@ const messages = {
     },
     table: {
       noData: 'Šiai datai kainų duomenys dar nepasiekiami.\nDuomenys įprastai pasiekiami po 15:00 vietos laiku (13:00 UTC).',
+      noDataHistorical: 'Šiai datai kainų duomenų bazėje nėra.',
       intervalHeader: 'Intervalas',
       priceHeader: 'Kaina ct/kWh',
       hourHeader: 'Kainos centais',

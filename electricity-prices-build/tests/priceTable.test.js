@@ -40,15 +40,24 @@ describe('PriceTable empty state', () => {
     });
   });
 
-  it('shows warning only when fewer than three price rows', () => {
+  it('shows historical empty message for past selected dates', () => {
+    const wrapper = mount(PriceTable, {
+      props: { priceData: [], selectedDate: '2026-06-14' },
+      global: { mocks: { $t: (key) => key } },
+    });
+
+    expect(wrapper.find('.alert-warning').exists()).toBe(true);
+    expect(wrapper.text()).toContain('table.noDataHistorical');
+  });
+
+  it('shows release-window message when no selected date is provided', () => {
     const wrapper = mount(PriceTable, {
       props: { priceData: [] },
       global: { mocks: { $t: (key) => key } },
     });
 
-    expect(wrapper.find('.alert-warning').exists()).toBe(true);
-    expect(wrapper.find('table.table').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('0.000');
+    expect(wrapper.text()).toContain('table.noData');
+    expect(wrapper.text()).not.toContain('table.noDataHistorical');
   });
 
   it('shows average badge when enough hourly rows exist', () => {

@@ -68,8 +68,8 @@ export function getCachedPrices(startDate, endDate, country = 'lt') {
   
   if (countryData.length === 0) return null;
   
-  const startTs = moment(startDate).startOf('day').unix();
-  const endTs = moment(endDate).endOf('day').unix();
+  const startTs = moment.tz(startDate, DISPLAY_TIMEZONE).startOf('day').unix();
+  const endTs = moment.tz(endDate, DISPLAY_TIMEZONE).endOf('day').unix();
   
   const filtered = countryData.filter(price => {
     return price.timestamp >= startTs && price.timestamp <= endTs;

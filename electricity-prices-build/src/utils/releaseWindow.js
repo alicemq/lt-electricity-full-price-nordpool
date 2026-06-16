@@ -139,10 +139,28 @@ export function shouldFetchFutureData(date, now = moment()) {
 }
 
 /**
+ * Parse any date input to the start of that calendar day in Vilnius.
+ * @param {Date|string|import('moment').Moment} date
+ */
+export function toDisplayDayMoment(date) {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return moment.tz(date, DISPLAY_TIMEZONE).startOf('day');
+  }
+  return moment(date).tz(DISPLAY_TIMEZONE).startOf('day');
+}
+
+/**
+ * @param {Date|string|import('moment').Moment} date
+ */
+export function formatDisplayDateString(date) {
+  return toDisplayDayMoment(date).format('YYYY-MM-DD');
+}
+
+/**
  * @param {Date|string|import('moment').Moment} date
  * @param {import('moment').Moment} [now]
  */
 export function isHistoricalDate(date, now = moment()) {
   const nowVilnius = now.clone().tz(DISPLAY_TIMEZONE);
-  return moment(date).tz(DISPLAY_TIMEZONE).isBefore(nowVilnius, 'day');
+  return toDisplayDayMoment(date).isBefore(nowVilnius, 'day');
 }
