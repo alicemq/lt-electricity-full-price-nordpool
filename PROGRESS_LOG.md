@@ -1,5 +1,11 @@
 # Progress Log
 
+## [2026-06-16] E2E frontend-only mode (#152)
+
+- `bin/run-e2e.sh`: `--frontend-only` / `--with-stack`, `--print-config`, `--help`.
+- Documented L5 modes and 10/16 baseline in `docs/checklists/ua-testing.md`.
+- CI: `tests/e2e/run-e2e-config.test.js` in `ci.yml`; `e2e.yml` uses `--with-stack`.
+
 ## [2026-06-16] UA3 live contract CI + UA10 debt register (#136, #119)
 
 - Wired `tests/contract/live-api-samples.test.js` into `ci-integration.yml` with `CONTRACT_FIXTURE=1`.
