@@ -314,12 +314,19 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 
 | Phase | Focus | This repo |
 | --- | --- | --- |
-| UA0 | Hygiene, AGENTS.md, gitignore, issue templates | **In progress** (#2, #115) |
-| UA1 | `/ready`, env single source, nginx alignment | Follow-up |
-| UA2 | CI fixture DB, integration tests | Done (#4) — `database/fixtures/ci_seed.sql`, golden runner, `ci-integration.yml` |
-| UA3+ | OpenAPI repair, golden tests, sync split, PWA | Planned |
+| Blockers | Human decisions before feature work | Partially open — see `docs/PROJECT-GOVERNANCE.md` §5 |
+| UA0 | Hygiene, AGENTS.md, gitignore, issue templates | **Done** (#2, #115) |
+| UA1 | `/ready`, env single source, nginx alignment | **Done** (#116, #117) |
+| UA2 | CI fixture DB, integration tests | **Done** (#4) — `database/fixtures/ci_seed.sql`, golden runner, `ci-integration.yml` |
+| UA3 | OpenAPI repair, Spectral, `/docs` UX | **Done** (#101; #146, #147) |
+| UA4 | Golden price / DST / MTU harness | **Planned** — next default slice |
+| UA5 | Split `syncWorker.js`, advisory lock | **Planned** — blocked on worker architecture (§5) |
+| UA6 | Post-deploy smoke, Coolify runbook | **Done** (#118) |
+| UA7–UA8 | PWA shell, client storage tiers | **Planned** |
+| UA9 | Push scaffold | **Optional** — not started |
+| UA10 | Debt register, checklists, adoption log | **Done** (#119) |
 
-Checklist source: `vendor/flows/examples/nordpool-revamp-checklist.md` (read-only reference).
+Checklist source: `vendor/flows/examples/nordpool-revamp-checklist.md` (read-only reference). Phase status detail: `docs/PROJECT-GOVERNANCE.md` §3. Post-backlog (2026-06-16): open revamp issues = 0; default next work is UA4.
 
 ## Writing style
 
