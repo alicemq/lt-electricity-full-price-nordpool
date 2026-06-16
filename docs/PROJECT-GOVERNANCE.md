@@ -98,13 +98,13 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Mostly done**; v0.7.1 cursor rules pending | #2 closed; **#115 open** |
 | **UA1** | `/ready`, env single source, nginx alignment | **Partial** | `/health` exists; **#116**, **#117** |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
-| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **In progress** | #101; baseline Spectral merged (#123); **#122** debt |
+| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **In progress** | #101; Spectral `spectral:oas` (#128); live contract CI (#136); **#122** closed |
 | **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
 | **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision |
 | **UA6** | Post-deploy smoke, Coolify runbook | **Planned** | **#118** |
 | **UA7–UA8** | PWA shell, client storage tiers | **Planned** | Not installed |
 | **UA9** | Push scaffold | **Optional** | Not started |
-| **UA10** | Debt register, checklists, adoption log | **Planned** | **#119**; no `PROGRESS_LOG.md` yet |
+| **UA10** | Debt register, checklists, adoption log | **In progress** | **#119**; register + `ua-testing` checklist landed; `PROGRESS_LOG.md` active |
 
 ### Decisions already made
 

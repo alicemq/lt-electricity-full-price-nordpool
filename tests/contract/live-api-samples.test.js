@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 
 const API_URL = (process.env.API_URL || process.env.LOCAL_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const LIVE = process.env.CONTRACT_LIVE === '1';
+/** CI integration uses historical ci_seed.sql — /ready is not_ready until live sync data exists. */
+const FIXTURE = process.env.CONTRACT_FIXTURE === '1';
 
 async function apiReachable() {
   try {
@@ -38,14 +40,29 @@ describe('live API contract samples', { skip: !LIVE }, () => {
     assert.ok('overallStatus' in body);
   });
 
-  it('GET /ready returns 200 when price data is fresh', async () => {
+  it('GET /ready returns structured checks', async () => {
     const ready = await fetchReady();
     assert.ok(ready, 'No /ready endpoint on API');
-    assert.equal(ready.res.status, 200, `${ready.path} expected 200`);
     const body = await ready.res.json();
-    assert.equal(body.status, 'ready');
-    assert.equal(body.checks.postgres, true);
-    assert.equal(body.checks.price_data_fresh, true);
+    assert.ok(body.checks);
+    assert.equal(typeof body.checks.postgres, 'boolean');
+    assert.equal(typeof body.checks.price_data_fresh, 'boolean');
+
+    if (FIXTURE) {
+      assert.equal(ready.res.status, 503, `${ready.path} expected 503 on CI fixture`);
+      assert.equal(body.status, 'not_ready');
+      assert.equal(body.checks.postgres, true);
+      assert.equal(body.checks.price_data_fresh, false);
+      return;
+    }
+
+    if (body.checks.price_data_fresh) {
+      assert.equal(ready.res.status, 200, `${ready.path} expected 200 when fresh`);
+      assert.equal(body.status, 'ready');
+    } else {
+      assert.equal(ready.res.status, 503, `${ready.path} expected 503 when stale`);
+      assert.equal(body.status, 'not_ready');
+    }
   });
 
   it('GET /api/v1/nps/prices returns today fixture or live data', async () => {

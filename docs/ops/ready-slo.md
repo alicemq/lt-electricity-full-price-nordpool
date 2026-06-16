@@ -33,4 +33,4 @@ curl -sf http://127.0.0.1:3000/ready
 curl -sf http://127.0.0.1:3000/api/v1/ready
 ```
 
-With CI fixture DB seeded, both SHOULD return 200 after Postgres is up.
+With CI fixture DB seeded (`database/fixtures/ci_seed.sql`), `/ready` returns **503** `not_ready` because seed data is historical; `checks.postgres` is true and `checks.price_data_fresh` is false. Golden scenario G5 asserts this.

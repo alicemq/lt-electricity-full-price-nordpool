@@ -6,6 +6,7 @@ on:
       - 'backend/**'
       - 'database/**'
       - 'tests/golden/**'
+      - 'tests/contract/**'
       - '.github/workflows/ci-integration.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'backend/**'
       - 'database/**'
       - 'tests/golden/**'
+      - 'tests/contract/**'
   workflow_dispatch:
 
 concurrency:
@@ -78,3 +80,10 @@ jobs:
           INTEGRATION_TESTS: '1'
           API_URL: http://127.0.0.1:3001
         run: node tests/golden/runner.test.js
+
+      - name: Live API contract samples (CI fixture)
+        env:
+          CONTRACT_LIVE: '1'
+          CONTRACT_FIXTURE: '1'
+          API_URL: http://127.0.0.1:3001
+        run: node --test tests/contract/live-api-samples.test.js
