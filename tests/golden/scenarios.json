@@ -35,11 +35,11 @@
   },
   {
     "id": "G5-ready",
-    "description": "Readiness returns ready with Postgres and fresh prices",
+    "description": "Readiness on CI fixture: postgres up, historical seed → not_ready 503",
     "method": "GET",
     "path": "/api/v1/ready",
-    "expectStatus": 200,
-    "expectBody": { "status": "ready" },
+    "expectStatus": 503,
+    "expectBody": { "status": "not_ready" },
     "expectBodyKeys": ["checks"]
   }
 ]
