@@ -24,6 +24,39 @@ test.describe('frontend smoke', () => {
     }
   });
 
+  test('upcoming grid includes the active 15-min slot', async ({ page }) => {
+    const frozenNow = new Date('2026-06-16T03:48:00+03:00');
+    const slot = (hour, minute) =>
+      Math.floor(new Date(`2026-06-16T${hour}:${minute}:00+03:00`).getTime() / 1000);
+    const cachePayload = {
+      version: 1,
+      data: {
+        lt: [
+          { timestamp: slot('03', '30'), price: 41.1 },
+          { timestamp: slot('03', '45'), price: 42.2 },
+          { timestamp: slot('04', '00'), price: 43.3 },
+          { timestamp: slot('04', '15'), price: 44.4 },
+          { timestamp: slot('04', '30'), price: 45.5 },
+        ],
+      },
+      lastUpdated: slot('03', '45'),
+    };
+
+    await page.clock.install({ time: frozenNow });
+    await page.addInitScript((payload) => {
+      localStorage.setItem('priceDataCache', JSON.stringify(payload));
+    }, cachePayload);
+
+    await page.goto('/upcoming?lang=lt');
+    await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
+
+    const table = page.locator('table.table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('tbody tr')).toHaveCount(2);
+    await expect(table.locator('tbody tr').first()).toContainText('03');
+    await expect(table.locator('tbody tr').first()).toContainText('45');
+  });
+
   test('today page loads with date controls and price or empty state', async ({ page }) => {
     await page.goto('/today?lang=lt');
     await expect(page).toHaveURL(/\/today/);

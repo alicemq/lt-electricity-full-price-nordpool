@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { calculatePrice } from '../../services/priceCalculationService';
-import { formatPriceHours, isCurrentHour } from '../../services/timeService';
+import { formatPriceHours, isCurrentHour, filterUpcomingSlots } from '../../services/timeService';
 
 const props = defineProps({
   priceData: {
@@ -28,9 +28,7 @@ const intervalSeconds = computed(() => {
 });
 
 const chartRows = computed(() => {
-  const nowSec = Math.floor(Date.now() / 1000);
-  const upcoming = props.priceData
-    .filter((row) => row.timestamp >= nowSec)
+  const upcoming = filterUpcomingSlots(props.priceData, intervalSeconds.value)
     .slice(0, props.maxHours);
 
   if (upcoming.length === 0) {

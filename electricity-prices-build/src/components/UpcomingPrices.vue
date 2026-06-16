@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue';
-import { formatPriceHours, isCurrentHour } from '../services/timeService';
+import { formatPriceHours, isCurrentHour, filterUpcomingSlots } from '../services/timeService';
 import { calculatePrice } from '../services/priceCalculationService';
 
 const props = defineProps({
@@ -30,9 +30,7 @@ const saveSettings = () => {
 };
 
 const upcomingPrices = computed(() => {
-  const nowSec = Math.floor(Date.now() / 1000);
-  return props.priceData
-    .filter(price => price.timestamp >= nowSec)
+  return filterUpcomingSlots(props.priceData, intervalSeconds.value)
     .slice(0, settings.value.numberOfHours);
 });
 
