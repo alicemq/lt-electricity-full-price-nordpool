@@ -95,16 +95,16 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | Phase | Focus | Status | Tracking |
 | --- | --- | --- | --- |
 | **Blockers** | Human decisions before feature work | **Partially open** | See §5 |
-| **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Mostly done**; v0.7.1 cursor rules pending | #2 closed; **#115 open** |
-| **UA1** | `/ready`, env single source, nginx alignment | **Done** | `/ready` #116; env SSOT #117 |
+| **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Done** | #2, #115 closed |
+| **UA1** | `/ready`, env single source, nginx alignment | **Done** | #116, #117 closed |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
-| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Done** | #101 — public-path contract samples; Express embed deferred per [swagger-ui-delivery.md](decisions/swagger-ui-delivery.md) |
+| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Done** | #101 closed (#146, #147); Express embed deferred per [swagger-ui-delivery.md](decisions/swagger-ui-delivery.md) |
 | **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
-| **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision |
+| **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision (§5) |
 | **UA6** | Post-deploy smoke, Coolify runbook | **Done** | #118; [docs/ops/post-deploy-verification.md](ops/post-deploy-verification.md) |
 | **UA7–UA8** | PWA shell, client storage tiers | **Planned** | Not installed |
 | **UA9** | Push scaffold | **Optional** | Not started |
-| **UA10** | Debt register, checklists, adoption log | **In progress** | **#119**; register + `ua-testing` checklist landed; `PROGRESS_LOG.md` active |
+| **UA10** | Debt register, checklists, adoption log | **Done** | #119 closed; register + `ua-testing` checklist + `PROGRESS_LOG.md` |
 
 ### Decisions already made
 
@@ -123,7 +123,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 
 | Pattern | Nordpool location |
 | --- | --- |
-| AGENTS.md handbook | Root `AGENTS.md` (partial v0.7 ship-by-default sync pending #115) |
+| AGENTS.md handbook | Root `AGENTS.md` (#115) |
 | smoke-local | `bin/smoke-local.sh` |
 | Git LFS DB snapshot | `bin/capture-db-lfs.sh`, `docs/ops/db-backup-lfs.md` |
 | Release window sync | `backend/src/lib/sync/`, frontend `releaseWindow.js` |
@@ -134,16 +134,10 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 
 | Pattern | Blocker / issue |
 | --- | --- |
-| Full cursor rules + `quality-gates.mdc` | #115 |
-| `flows-coordinator` skill | #115 |
-| `debt.yml` issue template | #115 |
-| `STRATEGY.md`, `PROGRESS_LOG.md` | #115, #119 |
-| `GET /ready` + freshness SLO | **Done** — [docs/ops/ready-slo.md](ops/ready-slo.md); #116 closed |
-| `load-env.sh` / `compose.sh` single source | **Done** — #117; [PROJECT-GUIDANCE.md](PROJECT-GUIDANCE.md) |
-| `post-deploy-smoke.sh`, `bulletproof.sh` | **Done** — #118 |
-| `review-debt-register.md`, ua checklists | #119 |
-| Full `spectral:oas` ruleset | Spectral crash; #122 |
 | Worker split + advisory lock | PO decision §5; UA5 |
+| Required E2E on every PR | Suite informative until stable (scheduled + `workflow_dispatch`) |
+| Express-embedded Swagger UI at `/docs` | Deferred per [swagger-ui-delivery.md](decisions/swagger-ui-delivery.md) |
+| Live contract samples as required merge gate | Documented deferral in [ua-testing.md](checklists/ua-testing.md) |
 
 ### Intentionally product-specific (not upstreamed to flows)
 
@@ -153,7 +147,7 @@ Price charts/color bands, screen layout editor, MTU completeness golden data, SE
 
 ## 4. Agent directives and quality gates
 
-Detail and commands: [AGENTS.md](../AGENTS.md). Cursor rules (when #115 lands): `.cursor/rules/`.
+Detail and commands: [AGENTS.md](../AGENTS.md). Cursor rules: `.cursor/rules/` (#115).
 
 ### Operating model
 
@@ -198,13 +192,13 @@ These match the checklist **Blockers** table. Agents MUST NOT assume a default f
 
 | # | Decision | Options | Status |
 | --- | --- | --- | --- |
-| 1 | **Sync admin API** | Restore `sync/trigger` + `sync/status` vs deprecate and rewrite docs | **OPEN** — OpenAPI drift (UA3) |
+| 1 | **Sync admin API** | Restore `sync/trigger` + `sync/status` vs deprecate and rewrite docs | **OPEN** — contract now documents paths; PO product decision pending |
 | 2 | **Worker architecture** | Keep cron inside API container vs split `services/worker` | **OPEN** — blocks UA5 |
 | 3 | **`/ready` SLO** | Postgres only vs price data freshness vs initial sync complete | **DECIDED: Postgres + 24h price freshness** — see [docs/ops/ready-slo.md](ops/ready-slo.md); #116 closed |
-| 4 | **Secrets rotation** | Rotate keys that lived in tracked `.env` files | **Operator-blocked** — #34 |
+| 4 | **Secrets rotation** | Rotate keys that lived in tracked `.env` files | **Done** — #34 closed |
 | 5 | **Deploy target** | Coolify vs CapRover | **DECIDED: Coolify** |
 
-**PO action requested:** Confirm rows 1–3 so UA1, UA3, and UA5 slices can proceed without rework.
+**PO action requested:** Confirm row 1 (sync admin API) and row 2 (worker architecture) so UA5 can proceed without rework.
 
 ---
 
@@ -212,41 +206,36 @@ These match the checklist **Blockers** table. Agents MUST NOT assume a default f
 
 Ordered by revamp dependency and PO impact. Live tracker: https://github.com/alicemq/lt-electricity-full-price-nordpool/issues
 
-### P1 — Unblock revamp foundation
+### P1 — Next revamp phases
 
-| Issue | Decision / outcome needed |
+| Track | Decision / outcome needed |
 | --- | --- |
-| **#115** | Adopt flows v0.7.1 agent infra (cursor rules, debt template, PROGRESS_LOG) — **prerequisite for consistent autonomous shipping** |
-| **#116** | Define and implement `/ready` SLO (depends on §5 row 3) |
-| **#101** | UA3 OpenAPI contract hygiene — **done** (public-path samples, PR gate docs; Express embed deferred) |
+| **UA4** | Golden price / DST / MTU harness with product data in-repo |
+| **UA5** | Worker split + advisory lock (blocked on §5 row 2) |
+| **§5 row 1** | Sync admin API: keep documented write paths vs deprecate |
 
-### P2 — Operational reliability and env consistency
+### P2 — Quality and UX (parallel)
 
-| Issue | Decision / outcome needed |
+| Track | Notes |
 | --- | --- |
-| **#105** | Startup `/health` behavior when Postgres not ready — degraded vs hard fail |
-| **#117** | Single env loading path for scripts, compose, E2E |
-| **#118** | Post-deploy smoke bundle (after `/ready`) |
-| **#119** | Debt register + UA checklists for auditable revamp progress |
-
-### P2 — Quality and UX (parallel when foundation stable)
-
-| Issue | Decision / outcome needed |
-| --- | --- |
-| **#122** | Resolve Spectral `spectral:oas` crash or switch lint strategy |
-| **#120** | A11y spot-checks in scheduled E2E |
-| **#124** | Bottom nav settings after today→upcoming chain (product bug) |
+| **E2E expansion** | Playwright suite exists (`tests/e2e/`); not required PR gate; run with stack up via `./bin/run-e2e.sh` |
+| **Live contract merge gate** | Deferred until `ci-integration` contract suite stable — [ua-testing.md](checklists/ua-testing.md) |
 
 ### Recently closed (context)
 
 | Issue | Outcome |
 | --- | --- |
+| **#101** | UA3 OpenAPI contract hygiene (#146, #147) |
+| **#115** | flows v0.7.1 agent infra (#126) |
+| **#116** / **#117** | `/ready` SLO + env SSOT |
+| **#118** / **#119** | Post-deploy smoke + debt register / checklists |
+| **#122** | Spectral `spectral:oas` in CI (#128) |
 | **#106** / **#121** | Fresh DB onboarding documented (LFS restore path) |
 | **#123** | UA3 quick-win: Spectral baseline in CI |
 
 ### Active slice (agent default)
 
-**UA3 OpenAPI** (#101, #122) after **#115** lands; **UA1 env** (#117) and **UA6 post-deploy smoke** (#118) after `/ready` SLO decision (§5 row 3 decided).
+**Post-backlog:** open revamp issues = 0 (2026-06-16). Default next work: **UA4** golden harness; expand E2E per AGENTS.md post-backlog gate; PO decisions §5 rows 1–2 before UA5.
 
 ---
 
