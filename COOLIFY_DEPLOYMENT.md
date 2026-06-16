@@ -320,3 +320,7 @@ After deployment, monitor:
 - Check service health endpoints
 - Verify environment variables are set correctly
 
+## Post-deploy verification
+
+After deploy or restore, run `./bin/post-deploy-smoke.sh` against the public API URL. See [docs/ops/post-deploy-verification.md](docs/ops/post-deploy-verification.md) for `/ready`, golden probe, and `bulletproof.sh` usage.
+

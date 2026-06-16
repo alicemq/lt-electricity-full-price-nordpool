@@ -138,7 +138,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | `flows-coordinator` skill | #115 |
 | `debt.yml` issue template | #115 |
 | `STRATEGY.md`, `PROGRESS_LOG.md` | #115, #119 |
-| `GET /ready` + freshness SLO | PO decision §5; #116 |
+| `GET /ready` + freshness SLO | **Done** — [docs/ops/ready-slo.md](ops/ready-slo.md); #116 closed |
 | `load-env.sh` / `compose.sh` single source | #117 |
 | `post-deploy-smoke.sh`, `bulletproof.sh` | #118 (depends on `/ready`) |
 | `review-debt-register.md`, ua checklists | #119 |
@@ -200,7 +200,7 @@ These match the checklist **Blockers** table. Agents MUST NOT assume a default f
 | --- | --- | --- | --- |
 | 1 | **Sync admin API** | Restore `sync/trigger` + `sync/status` vs deprecate and rewrite docs | **OPEN** — OpenAPI drift (UA3) |
 | 2 | **Worker architecture** | Keep cron inside API container vs split `services/worker` | **OPEN** — blocks UA5 |
-| 3 | **`/ready` SLO** | Postgres only vs price data freshness vs initial sync complete | **OPEN** — #116 implements once chosen |
+| 3 | **`/ready` SLO** | Postgres only vs price data freshness vs initial sync complete | **DECIDED: Postgres + 24h price freshness** — see [docs/ops/ready-slo.md](ops/ready-slo.md); #116 closed |
 | 4 | **Secrets rotation** | Rotate keys that lived in tracked `.env` files | **Operator-blocked** — #34 |
 | 5 | **Deploy target** | Coolify vs CapRover | **DECIDED: Coolify** |
 
@@ -246,7 +246,7 @@ Ordered by revamp dependency and PO impact. Live tracker: https://github.com/ali
 
 ### Active slice (agent default)
 
-**UA3 OpenAPI** (#101, #122) after **#115** lands; **UA1 `/ready`** (#116) waits on PO SLO choice in §5.
+**UA3 OpenAPI** (#101, #122) after **#115** lands; **UA1 env** (#117) and **UA6 post-deploy smoke** (#118) after `/ready` SLO decision (§5 row 3 decided).
 
 ---
 

@@ -5,21 +5,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-if [[ -f deploy/local.env ]]; then
-  # shellcheck disable=SC1091
-  set -a
-  source deploy/local.env
-  set +a
-fi
+# shellcheck source=load-env.sh
+source "${ROOT}/bin/load-env.sh"
 
 API_URL="${LOCAL_API_URL:-http://127.0.0.1:3000}"
 
 echo "==> docker compose config"
-docker compose config -q
+bash bin/compose.sh config -q
 
 if [[ -f docker-compose.dev.yml ]]; then
   echo "==> docker compose dev config"
-  docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
+  bash bin/compose.sh -f docker-compose.yml -f docker-compose.dev.yml config -q
 fi
 
 echo "==> OpenAPI file exists"
@@ -37,6 +33,18 @@ if command -v npm >/dev/null 2>&1; then
   npm run build --prefix electricity-prices-build
 fi
 
+fixture_seeded=0
+if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
+  if curl -sf "${API_URL}/api/v1/nps/prices?date=2024-06-15&country=lt" 2>/dev/null \
+    | grep -q '"count":24'; then
+    fixture_seeded=1
+  fi
+fi
+
+if [[ "${SMOKE_REQUIRE_READY:-0}" == "1" ]]; then
+  fixture_seeded=1
+fi
+
 if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
   echo "==> GET /health OK"
   curl -sf "${API_URL}/health" | head -c 200 || true
@@ -48,6 +56,16 @@ if curl -sf "${API_URL}/health" >/dev/null 2>&1; then
   echo "    HTTP ${ready_code}"
   head -c 200 /tmp/nordpool-ready.json || true
   echo ""
+
+  if [[ "${fixture_seeded}" -eq 1 ]]; then
+    if [[ "${ready_code}" != "200" ]]; then
+      echo "FAIL: /ready HTTP ${ready_code} with CI fixture seeded (expect 200; see docs/ops/ready-slo.md)"
+      exit 1
+    fi
+    echo "    /ready OK (fixture seeded; SMOKE_REQUIRE_READY or ci_seed detected)"
+  else
+    echo "    /ready non-200 tolerated before fixture seed (set SMOKE_REQUIRE_READY=1 to hard-fail)"
+  fi
 
   echo "==> GET /api/v1/sync/status OK"
   curl -sf "${API_URL}/api/v1/sync/status" | head -c 200 || true
