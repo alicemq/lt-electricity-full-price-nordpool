@@ -33,7 +33,7 @@ test.describe('frontend smoke', () => {
     await expect(todayPage.getByRole('button', { name: 'Rytoj' })).toBeVisible();
     await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
 
-    const dateInput = todayPage.locator('.dp__input');
+    const dateInput = todayPage.getByRole('combobox', { name: 'Datepicker input' });
     await expect(dateInput).toBeVisible();
     await expect(dateInput).toHaveValue(/\d{4}-\d{2}-\d{2}/);
 
@@ -58,7 +58,7 @@ test.describe('frontend smoke', () => {
     await todayPage.getByRole('button', { name: 'Rytoj' }).click();
     await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
 
-    const dateInput = todayPage.locator('.dp__input');
+    const dateInput = todayPage.getByRole('combobox', { name: 'Datepicker input' });
     await expect(dateInput).toHaveValue(/\d{4}-\d{2}-\d{2}/);
 
     const table = page.locator('table.table');
@@ -105,6 +105,7 @@ test.describe('frontend smoke', () => {
 
     await nav.getByRole('button', { name: 'Artimiausios' }).click();
     await expect(page).toHaveURL(/\/upcoming/);
+    await expect(page.locator('.upcoming-page')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.today-page')).toHaveCount(0);
 
     await nav.getByRole('button', { name: 'Nustatymai' }).click();

@@ -26,13 +26,13 @@ const router = useRouter()
 const route = useRoute()
 
 function goToday() {
-  router.push({ name: 'today' })
+  router.push({ name: 'today', query: route.query })
 }
 function goUpcoming() {
-  router.push({ name: 'upcoming' })
+  router.push({ name: 'upcoming', query: route.query })
 }
 function goSettings() {
-  router.push({ name: 'settings' })
+  router.push({ name: 'settings', query: route.query })
 }
 function goSwagger() {
   router.push({ name: 'swagger' })

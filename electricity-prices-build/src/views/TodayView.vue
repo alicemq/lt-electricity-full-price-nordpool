@@ -6,6 +6,8 @@ import { useRoute, onBeforeRouteLeave } from 'vue-router'
 
 import moment from 'moment-timezone';
 
+import { lt as ltLocale } from 'date-fns/locale';
+
 import { fetchPrices, onPricesUpdated, runSmartSync } from '../services/priceService';
 
 import { calculatePrice, logAllPriceBreakdowns } from '../services/priceCalculationService';
@@ -78,6 +80,8 @@ let refreshTimeout = null;
 
 let unsubscribePrices = null;
 
+let reloadPromise = null;
+
 
 
 function selectedDateAsDate() {
@@ -147,33 +151,28 @@ function handleVisibilityChange() {
 
 
 async function reloadPrices() {
-
-  try {
-
-    isLoading.value = true;
-
-    error.value = null;
-
-    const data = await fetchPrices(selectedDateAsDate());
-
-    priceData.value = data.data?.lt || [];
-
-    await nextTick();
-
-    logAllPriceBreakdowns();
-
-  } catch (err) {
-
-    error.value = err?.message || 'Failed to load prices';
-
-    priceData.value = [];
-
-  } finally {
-
-    isLoading.value = false;
-
+  if (reloadPromise) {
+    return reloadPromise;
   }
 
+  reloadPromise = (async () => {
+    try {
+      isLoading.value = true;
+      error.value = null;
+      const data = await fetchPrices(selectedDateAsDate());
+      priceData.value = data.data?.lt || [];
+      await nextTick();
+      logAllPriceBreakdowns();
+    } catch (err) {
+      error.value = err?.message || 'Failed to load prices';
+      priceData.value = [];
+    } finally {
+      isLoading.value = false;
+      reloadPromise = null;
+    }
+  })();
+
+  return reloadPromise;
 }
 
 
@@ -213,10 +212,11 @@ onUnmounted(() => {
 
 
 
-watch(selectedDate, () => {
-
+watch(selectedDate, (nextDate, prevDate) => {
+  if (prevDate !== undefined && nextDate === prevDate) {
+    return;
+  }
   reloadPrices();
-
 });
 
 
@@ -322,14 +322,11 @@ function setTomorrow() {
 
       <div class="d-flex gap-2 mb-3">
 
-        <VueDatePicker v-model="selectedDate" locale="lt" month-name-format="long" format="yyyy-MM-dd"
-
-          model-type="yyyy-MM-dd" :timezone="DISPLAY_TIMEZONE"
-
+        <VueDatePicker v-model="selectedDate" :locale="ltLocale"
+          :formats="{ input: 'yyyy-MM-dd', month: 'MMMM' }"
+          model-type="yyyy-MM-dd"
           auto-apply reverse-years :enable-time-picker="false"
-
           :max-date="maxDate" :min-date="minDate" prevent-min-max-navigation
-
           class="flex-grow-1" />
 
         <button @click="setToday" class="btn btn-secondary">{{ $t('home.today') }}</button>

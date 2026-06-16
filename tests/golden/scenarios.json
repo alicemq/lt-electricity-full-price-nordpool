@@ -32,5 +32,14 @@
     "path": "/api/v1/nps/prices?date=2024-06-15&country=lt",
     "expectStatus": 200,
     "expectDataFirstPrice": 45.5
+  },
+  {
+    "id": "G5-ready",
+    "description": "Readiness returns ready with Postgres and fresh prices",
+    "method": "GET",
+    "path": "/api/v1/ready",
+    "expectStatus": 200,
+    "expectBody": { "status": "ready" },
+    "expectBodyKeys": ["checks"]
   }
 ]

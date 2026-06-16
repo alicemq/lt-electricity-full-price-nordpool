@@ -102,7 +102,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container-fluid px-2 px-md-3">
+  <div class="container-fluid px-2 px-md-3 upcoming-page">
     <!-- Loading and error states -->
     <div v-if="isLoading" class="alert alert-info">
       {{ $t('upcoming.loading') }}
