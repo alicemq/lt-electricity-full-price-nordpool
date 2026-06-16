@@ -83,6 +83,62 @@ test.describe('frontend smoke', () => {
     }
   });
 
+  test('today past date loads prices from API when cache is empty', async ({ page }) => {
+    const frozenNow = new Date('2026-06-16T05:00:00+03:00');
+    const slot = (date, hour) =>
+      Math.floor(new Date(`${date}T${hour}:00:00+03:00`).getTime() / 1000);
+    const pastDate = '2026-06-14';
+    const apiPrices = ['00', '01', '02'].map((hour, index) => ({
+      timestamp: slot(pastDate, hour),
+      price: 40 + index,
+    }));
+
+    await page.clock.install({ time: frozenNow });
+    await page.route('**/api/v1/nps/prices?date=2026-06-14&country=lt', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { lt: apiPrices },
+          meta: { country: 'lt', count: apiPrices.length, timezone: 'Europe/Vilnius' },
+        }),
+      });
+    });
+
+    await page.goto(`/today?lang=lt&date=${pastDate}`);
+    await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
+
+    const table = page.locator('table.table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('tbody tr')).toHaveCount(3);
+    await expect(page.getByText('Šiai datai kainų duomenys dar nepasiekiami.')).toHaveCount(0);
+    await expect(page.getByText('Šiai datai kainų duomenų bazėje nėra.')).toHaveCount(0);
+  });
+
+  test('today past date shows historical empty message when API has no data', async ({ page }) => {
+    const frozenNow = new Date('2026-06-16T05:00:00+03:00');
+    const pastDate = '2026-06-14';
+
+    await page.clock.install({ time: frozenNow });
+    await page.route('**/api/v1/nps/prices?date=2026-06-14&country=lt', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { lt: [] },
+          meta: { country: 'lt', count: 0, timezone: 'Europe/Vilnius' },
+        }),
+      });
+    });
+
+    await page.goto(`/today?lang=lt&date=${pastDate}`);
+    await expect(page.getByText(LOADING_TEXT)).toBeHidden({ timeout: 20_000 });
+    await expect(page.getByText('Šiai datai kainų duomenų bazėje nėra.')).toBeVisible();
+    await expect(page.getByText('Šiai datai kainų duomenys dar nepasiekiami.')).toHaveCount(0);
+  });
+
   test('today tomorrow button keeps date visible in empty-data window', async ({ page }) => {
     await page.goto('/today?lang=lt');
     const todayPage = page.locator('.today-page');

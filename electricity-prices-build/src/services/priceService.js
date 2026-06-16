@@ -18,6 +18,8 @@ import {
   getMsUntilNextWindowStart,
   isHistoricalDate,
   shouldFetchFutureData,
+  toDisplayDayMoment,
+  formatDisplayDateString,
   RELEASE_PHASE,
 } from '../utils/releaseWindow';
 import { isDaySynced } from '../utils/deviceSyncState';
@@ -87,16 +89,16 @@ function canFetchFromNetwork(date, { force = false } = {}) {
 export async function fetchPrices(date, country = 'lt', options = {}) {
   getPriceSettings();
 
-  const formattedDate = moment(date).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD');
-  const startDate = moment(date).tz(DISPLAY_TIMEZONE).startOf('day');
-  const endDate = moment(date).tz(DISPLAY_TIMEZONE).endOf('day');
+  const dayMoment = toDisplayDayMoment(date);
+  const formattedDate = formatDisplayDateString(date);
+  const startDate = dayMoment.clone();
+  const endDate = dayMoment.clone().endOf('day');
   const cached = getCachedPrices(startDate.toDate(), endDate.toDate(), country);
 
   if (cached && cached.length > 0) {
     const validation = validateDayCompleteness(formattedDate, country);
-    const isHistorical = isHistoricalDate(date);
 
-    if (isHistorical || validation.isComplete || !canFetchFromNetwork(date, options)) {
+    if (validation.isComplete || !canFetchFromNetwork(date, options)) {
       return buildCachedResponse(cached, country, { date: formattedDate });
     }
   } else if (!canFetchFromNetwork(date, options)) {
