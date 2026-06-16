@@ -98,7 +98,7 @@ Blockers → UA0 → UA1 → UA2 → UA3 → UA4 → UA5 → UA6 → UA7 → UA8
 | **UA0** | Hygiene, AGENTS.md, templates, agent infra | **Mostly done**; v0.7.1 cursor rules pending | #2 closed; **#115 open** |
 | **UA1** | `/ready`, env single source, nginx alignment | **Done** | `/ready` #116; env SSOT #117 |
 | **UA2** | CI fixture DB, integration tests | **Done** | #4; golden harness, `ci-integration.yml` |
-| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **In progress** | #101; Spectral `spectral:oas` (#128); live contract CI (#136); **#122** closed |
+| **UA3** | OpenAPI repair, Spectral, `/docs` UX | **Mostly done** | #101 open — contract sample expansion; optional Express embed deferred |
 | **UA4** | Golden price / DST / MTU harness | **Planned** | Product golden data in-repo |
 | **UA5** | Split `syncWorker.js`, advisory lock | **Planned** | Blocked on worker architecture decision |
 | **UA6** | Post-deploy smoke, Coolify runbook | **Done** | #118; [docs/ops/post-deploy-verification.md](ops/post-deploy-verification.md) |

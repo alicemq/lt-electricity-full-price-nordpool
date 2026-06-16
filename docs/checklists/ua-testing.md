@@ -26,7 +26,8 @@ Use after UA2 (CI scaffold green). Aligns with [agentic-workflow-plan.md](../pla
 
 - [x] `tests/contract/openapi-samples.test.js` (OpenAPI structure, no API)
 - [x] `tests/contract/live-api-samples.test.js` (`CONTRACT_LIVE=1`, `CONTRACT_FIXTURE=1` in CI integration)
-- [ ] Every public path has sample or golden coverage (UA3 #101)
+- [x] Representative OpenAPI samples: health, `/ready`, sync status, `/nps/prices` (#101)
+- [ ] Every public path has sample or golden coverage (UA3 remainder)
 
 ## L4 — Boot smoke (local + post-deploy)
 

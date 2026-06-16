@@ -38,5 +38,11 @@ test('OpenAPI defines GET /sync/status data.isRunning', () => {
   assert.match(spec, /operationId: getSyncStatus/);
 });
 
+test('OpenAPI defines GET /nps/prices with success response', () => {
+  assert.match(spec, /\/nps\/prices:\s*\r?\n\s*get:/);
+  assert.match(spec, /operationId: getNpsPrices/);
+  assert.match(spec, /success:\s*\r?\n\s*type: boolean/);
+});
+
 console.log(`\nContract sample results: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
