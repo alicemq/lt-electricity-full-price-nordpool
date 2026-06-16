@@ -49,6 +49,6 @@ CONTRACT_LIVE=1 API_URL=http://127.0.0.1:3000 node --test tests/contract/live-ap
 CONTRACT_LIVE=1 CONTRACT_FIXTURE=1 API_URL=http://127.0.0.1:3001 node --test tests/contract/live-api-samples.test.js
 ```
 
-OpenAPI structure samples (no running API) run in CI via `tests/contract/openapi-samples.test.js`.
+OpenAPI structure samples (no running API) run in CI via `tests/contract/openapi-samples.test.js` on every PR (`ci.yml`). Live contract samples run in `ci-integration.yml` when backend or contract paths change (`CONTRACT_LIVE=1 CONTRACT_FIXTURE=1`). Gate matrix: [ua-testing.md](../checklists/ua-testing.md#contract-pr-gate-ua3).
 
 Swagger UI delivery decision: [docs/decisions/swagger-ui-delivery.md](../decisions/swagger-ui-delivery.md).

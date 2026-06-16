@@ -27,7 +27,7 @@ Use after UA2 (CI scaffold green). Aligns with [agentic-workflow-plan.md](../pla
 - [x] `tests/contract/openapi-samples.test.js` (OpenAPI structure, no API)
 - [x] `tests/contract/live-api-samples.test.js` (`CONTRACT_LIVE=1`, `CONTRACT_FIXTURE=1` in CI integration)
 - [x] Representative OpenAPI samples: health, `/ready`, sync status, `/nps/prices` (#101)
-- [ ] Every public path has sample or golden coverage (UA3 remainder)
+- [x] Every public path has sample or golden coverage (UA3 remainder, #101)
 
 ## L4 — Boot smoke (local + post-deploy)
 
@@ -42,7 +42,17 @@ Use after UA2 (CI scaffold green). Aligns with [agentic-workflow-plan.md](../pla
 - [x] Playwright axe spot-checks (#120, #127)
 - [ ] Required PR gate (deferred until suite stable)
 
-## Verification commands
+## Contract PR gate (UA3)
+
+| Layer | When | Workflow job | Command |
+| --- | --- | --- | --- |
+| OpenAPI structure samples | Every PR | `ci.yml` → `lint-and-unit` | `node --test tests/contract/openapi-samples.test.js` |
+| OpenAPI JSON sync | Every PR | `ci.yml` → `lint-and-unit` | `node bin/openapi-json-from-yaml.js --check` |
+| Route parity | Every PR | `ci.yml` → `lint-and-unit` | `node bin/validate-openapi-routes.js` |
+| Spectral lint | Every PR | `ci.yml` → `lint-and-unit` | `npx @stoplight/spectral-cli lint swagger-ui/openapi.yaml` |
+| Live response shapes | PR/push when `backend/**` or `tests/contract/**` change | `ci-integration.yml` | `CONTRACT_LIVE=1 CONTRACT_FIXTURE=1 API_URL=… node --test tests/contract/live-api-samples.test.js` |
+
+Public path registry: `tests/contract/public-paths.js` (structure tests iterate this list).
 
 ```bash
 ./bin/smoke-local.sh
